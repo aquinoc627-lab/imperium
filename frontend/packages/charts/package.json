@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "recharts": "^2.12.7",
+    "recharts": "^3.10.1",
     "d3-scale": "^4.0.2",
     "d3-array": "^3.2.4"
   },

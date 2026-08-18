@@ -1,0 +1,42 @@
+# Multi-stage build for IMPERIUM daemon
+# Stage 1: Build
+FROM rust:1.78-slim-bookworm AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    libssl-dev \
+    libsqlite3-dev \
+    clang \
+    lld \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ ./crates/
+
+# Build workspace (cached dependencies)
+RUN cargo build --workspace --release --bin imperium-daemon
+
+# Stage 2: Runtime
+FROM gcr.io/distroless/cc-debian12:nonroot
+
+WORKDIR /app
+
+# Copy binary
+COPY --from=builder /app/target/release/imperium-daemon /app/imperium-daemon
+
+# Create non-root user
+USER nonroot:nonroot
+
+# Expose ports
+EXPOSE 8080 50051
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["/app/imperium-daemon", "health"]
+
+# Entry point
+ENTRYPOINT ["/app/imperium-daemon"]

@@ -1,0 +1,22 @@
+[package]
+name = "imperium-store"
+version = "0.1.0-dev"
+edition = "2021"
+license = "BSL-1.0"
+description = "SQLite event store with projections and snapshots"
+repository = "https://github.com/yourorg/imperium"
+
+[dependencies]
+imperium-core = { path = "../imperium-core" }
+sqlx = { workspace = true }
+rusqlite = { workspace = true }
+redb = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+postcard = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+ulid = { workspace = true }

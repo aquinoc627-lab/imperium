@@ -1,0 +1,17 @@
+[package]
+name = "imperium-sync"
+version = "0.1.0-dev"
+edition = "2021"
+license = "BSL-1.0"
+description = "P2P sync with libp2p/WebRTC and CRDT integration"
+repository = "https://github.com/yourorg/imperium"
+
+[dependencies]
+imperium-core = { path = "../imperium-core" }
+libp2p = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }

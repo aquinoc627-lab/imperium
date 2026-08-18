@@ -1,0 +1,28 @@
+# Multi-stage build for IMPERIUM CLI
+FROM rust:1.78-slim-bookworm AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    libssl-dev \
+    libsqlite3-dev \
+    clang \
+    lld \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ ./crates/
+
+RUN cargo build --workspace --release --bin imperium-cli
+
+# Runtime - distroless
+FROM gcr.io/distroless/static-debian12:nonroot
+
+WORKDIR /app
+
+COPY --from=builder /app/target/release/imperium-cli /app/imperium-cli
+
+USER nonroot:nonroot
+
+ENTRYPOINT ["/app/imperium-cli"]

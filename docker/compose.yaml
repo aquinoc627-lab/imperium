@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  imperium-daemon:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.daemon
+    image: imperium-daemon:dev
+    container_name: imperium-daemon
+    ports:
+      - "8080:8080"   # HTTP API
+      - "50051:50051" # gRPC
+    volumes:
+      - imperium-data:/data
+      - imperium-config:/config
+      - ../python:/app/python:ro
+      - ../frontend/dist:/app/frontend:ro
+    environment:
+      - IMPERIUM_DATA_DIR=/data
+      - IMPERIUM_CONFIG_DIR=/config
+      - IMPERIUM_LOG_LEVEL=debug
+      - IMPERIUM_ALLOW_CLOUD_ROUTING=false
+      - IMPERIUM_REDACT_PII=true
+      - RUST_LOG=imperium=debug,tower_http=debug
+    healthcheck:
+      test: ["CMD", "/app/imperium-daemon", "health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - imperium-net
+
+  imperium-frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    image: imperium-frontend:dev
+    container_name: imperium-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend:/app:ro
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    depends_on:
+      - imperium-daemon
+    networks:
+      - imperium-net
+
+  # Optional: Grafana for observability
+  grafana:
+    image: grafana/grafana:10.2
+    container_name: imperium-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=imperium
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - imperium-net
+
+  # Optional: Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:v2.48
+    container_name: imperium-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - imperium-net
+
+volumes:
+  imperium-data:
+  imperium-config:
+  grafana-data:
+  prometheus-data:
+
+networks:
+  imperium-net:
+    driver: bridge

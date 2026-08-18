@@ -1,0 +1,116 @@
+version: 2
+updates:
+  # Rust dependencies
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "rust"
+    groups:
+      rust-dev-tools:
+        patterns:
+          - "cargo-*"
+          - "clippy"
+          - "rustfmt"
+      rust-crypto:
+        patterns:
+          - "ring"
+          - "ed25519-dalek"
+          - "x25519-dalek"
+          - "aes-gcm"
+          - "argon2"
+      rust-web:
+        patterns:
+          - "tokio"
+          - "tonic"
+          - "prost"
+          - "libp2p"
+      rust-testing:
+        patterns:
+          - "criterion"
+          - "proptest"
+          - "quickcheck"
+
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/python"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      python-ml:
+        patterns:
+          - "torch"
+          - "transformers"
+          - "sentence-transformers"
+          - "scikit-learn"
+          - "numpy"
+          - "pandas"
+      python-web:
+        patterns:
+          - "fastapi"
+          - "uvicorn"
+          - "httpx"
+          - "pydantic"
+      python-testing:
+        patterns:
+          - "pytest"
+          - "hypothesis"
+          - "faker"
+
+  # Node.js dependencies
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "frontend"
+    groups:
+      frontend-react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "react-router"
+          - "@types/react*"
+      frontend-ui:
+        patterns:
+          - "@radix-ui/*"
+          - "tailwindcss"
+          - "lucide-react"
+      frontend-testing:
+        patterns:
+          - "vitest"
+          - "@testing-library/*"
+          - "playwright"
+      frontend-build:
+        patterns:
+          - "vite"
+          - "typescript"
+          - "eslint"
+          - "prettier"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"

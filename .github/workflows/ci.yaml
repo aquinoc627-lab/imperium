@@ -1,0 +1,234 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # --- Rust ---
+  rust-fmt:
+    name: Rust Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  rust-clippy:
+    name: Rust Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  rust-test:
+    name: Rust Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo nextest run --workspace
+
+  rust-audit:
+    name: Rust Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install cargo-audit cargo-deny
+      - run: cargo audit
+      - run: cargo deny check
+
+  # --- Python ---
+  python-lint:
+    name: Python Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+      - run: cd python && uv pip install -e ".[dev]"
+      - run: cd python && uv run ruff format --check .
+      - run: cd python && uv run ruff check .
+      - run: cd python && uv run mypy .
+
+  python-test:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+      - run: cd python && uv pip install -e ".[dev]"
+      - run: cd python && uv run pytest -xvs --cov=imperium --cov-report=xml
+
+  python-audit:
+    name: Python Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit
+      - run: cd python && uv pip compile pyproject.toml -o requirements.txt && pip-audit -r requirements.txt
+
+  # --- Frontend ---
+  frontend-lint:
+    name: Frontend Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: cd frontend && pnpm install --frozen-lockfile
+      - run: cd frontend && pnpm lint
+      - run: cd frontend && pnpm typecheck
+      - run: cd frontend && pnpm format --check
+
+  frontend-test:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: cd frontend && pnpm install --frozen-lockfile
+      - run: cd frontend && pnpm test --run
+
+  # --- Integration ---
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [rust-test, python-test, frontend-test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: |
+          cd python && uv pip install -e ".[dev]"
+          cd ../frontend && pnpm install --frozen-lockfile
+      - run: cargo test --test integration --workspace
+      - run: cd python && uv run pytest tests/integration -xvs
+
+  # --- Build ---
+  build-all:
+    name: Build All
+    runs-on: ubuntu-latest
+    needs: [rust-test, python-test, frontend-test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --workspace --release
+
+  # --- Benchmarks ---
+  benchmarks:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: [build-all]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+      - run: cargo bench --workspace -- --save-baseline main
+      - run: cd python && uv pip install -e ".[dev]" && uv run pytest --benchmark-only
+
+  # --- Release ---
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [rust-test, python-test, frontend-test, integration-test]
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/rekor-installer@v1
+
+      # Build
+      - run: cargo build --workspace --release
+      - run: cd python && uv pip install -e "." && uv run python -m build
+      - run: cd frontend && pnpm install --frozen-lockfile && pnpm build
+
+      # Sign
+      - name: Sign artifacts
+        run: |
+          cosign sign-blob --yes --output-signature cli.sig target/release/imperium-cli
+          cosign sign-blob --yes --output-signature daemon.sig target/release/imperium-daemon
+
+      # Attest
+      - name: Generate SLSA provenance
+        uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.9.0
+        with:
+          base64-subjects: ${{ hashFiles('target/release/imperium-*') }}
+
+      # Upload
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/release/imperium-cli
+            target/release/imperium-daemon
+            target/release/imperium-cli.sig
+            target/release/imperium-daemon.sig
+          generate_release_notes: true

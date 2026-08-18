@@ -1,0 +1,18 @@
+[package]
+name = "imperium-core"
+version = "0.1.0-dev"
+edition = "2021"
+license = "BSL-1.0"
+description = "Core types for IMPERIUM"
+repository = "https://github.com/yourorg/imperium"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+postcard = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+ulid = { workspace = true }
+chrono = { version = "0.4", features = ["serde", "clock"] }
+bytes = { workspace = true }
+zeroize = { workspace = true }
+secrecy = { workspace = true }

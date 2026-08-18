@@ -1,0 +1,21 @@
+[package]
+name = "imperium-ffi"
+version = "0.1.0-dev"
+edition = "2021"
+license = "BSL-1.0"
+description = "C/FFI interface for Python and Node.js bindings"
+repository = "https://github.com/yourorg/imperium"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+imperium-core = { path = "../imperium-core" }
+imperium-runtime = { path = "../imperium-runtime" }
+imperium-store = { path = "../imperium-store" }
+imperium-policy = { path = "../imperium-policy" }
+imperium-crypto = { path = "../imperium-crypto" }
+libc = "0.2"
+serde = { workspace = true }
+postcard = { workspace = true }
+uuid = { workspace = true }

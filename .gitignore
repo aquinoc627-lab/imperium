@@ -1,0 +1,71 @@
+# Dependencies
+node_modules/
+python/.venv/
+target/
+Cargo.lock
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage/
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Test outputs
+test-results/
+coverage/
+.nyc_output/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Keys and secrets
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+
+# Model files (large binaries)
+models/
+*.bin
+*.onnx
+*.gguf
+
+# WASM cache
+.wasm-cache/
+
+# Nix
+result
+result-*

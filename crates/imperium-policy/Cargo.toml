@@ -1,0 +1,17 @@
+[package]
+name = "imperium-policy"
+version = "0.1.0-dev"
+edition = "2021"
+license = "BSL-1.0"
+description = "Embedded OPA/Rego policy engine"
+repository = "https://github.com/yourorg/imperium"
+
+[dependencies]
+imperium-core = { path = "../imperium-core" }
+opa-wasm = { workspace = true }
+rego = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,20 @@
+{
+  "name": "@imperium/voice",
+  "version": "0.1.0-dev",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ricky0123/porcupine-web": "^0.2.0",
+    "@ricky0123/kokoro-web": "^0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

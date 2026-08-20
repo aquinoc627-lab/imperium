@@ -5,19 +5,12 @@ default: help
 help:
 	@just --list
 
-# --- Build ---
-build-rust:
-	cargo build --workspace --release
+# One-shot after clone. Requires Node 22+ and Rust stable.
+v0: test-v0-js test-v0-rust
+	bash scripts/v0-smoke.sh
 
-build-python:
-	cd python && uv pip compile pyproject.toml -o requirements.txt && uv pip install -r requirements.txt
+# --- v0 slice (working product) ---
 
-build-frontend:
-	cd frontend && pnpm install && pnpm build
-
-build-all: build-rust build-python build-frontend
-
-# v0 slice (working product)
 test-v0-js:
 	cd web/v0 && node --experimental-strip-types --test src/*.test.ts
 
@@ -26,9 +19,22 @@ test-v0-rust:
 	cargo test -p imperium-cli
 
 test-v0: test-v0-js test-v0-rust
+	bash scripts/v0-smoke.sh
 
+# --- Build ---
+build-rust:
+	cargo build -p imperium-core -p imperium-cli
+
+build-python:
+	cd python && uv pip compile pyproject.toml -o requirements.txt && uv pip install -r requirements.txt
+
+build-frontend:
+	cd frontend && pnpm install && pnpm build
+
+# --- Other tests (scaffolding; expect gaps) ---
 test-rust:
-	cargo nextest run --workspace
+	cargo test -p imperium-core --lib
+	cargo test -p imperium-cli
 
 test-python:
 	cd python && uv run pytest -xvs
@@ -36,11 +42,9 @@ test-python:
 test-frontend:
 	cd frontend && pnpm test
 
-test-all: test-rust test-python test-frontend
-
 # --- Lint/Format ---
 fmt-rust:
-	cargo fmt --all
+	cargo fmt -p imperium-core -p imperium-cli
 
 fmt-python:
 	cd python && uv run ruff format . && uv run ruff check --fix .
@@ -48,10 +52,8 @@ fmt-python:
 fmt-frontend:
 	cd frontend && pnpm format
 
-fmt-all: fmt-rust fmt-python fmt-frontend
-
 lint-rust:
-	cargo clippy --workspace --all-targets --all-features -- -D warnings
+	cargo clippy -p imperium-core -p imperium-cli --all-targets -- -D warnings
 
 lint-python:
 	cd python && uv run ruff check . && uv run mypy .
@@ -59,38 +61,16 @@ lint-python:
 lint-frontend:
 	cd frontend && pnpm lint
 
-lint-all: lint-rust lint-python lint-frontend
-
-# --- Check (CI gate) ---
-check: fmt-all lint-all test-all
-
 # --- Run ---
-run-daemon:
-	cargo run --bin imperium-daemon -- --foreground
-
 run-cli:
-	cargo run --bin imperium-cli --
+	cargo run -p imperium-cli --
 
 # --- Dev ---
 dev-shell:
 	nix develop
 
-update-deps:
-	cargo update
-	cd python && uv pip compile --upgrade pyproject.toml -o requirements.txt
-	cd frontend && pnpm update
-
-# --- Benchmarks ---
-bench-rust:
-	cargo bench --workspace
-
-bench-python:
-	cd python && uv run pytest --benchmark-only
-
 # --- Clean ---
 clean:
 	cargo clean
-	rm -rf python/.venv frontend/node_modules frontend/dist
+	rm -rf python/.venv frontend/node_modules frontend/dist .imperium
 	rm -f requirements.txt
-
-.PHONY: help build-rust build-python build-frontend build-all test-rust test-python test-frontend test-all fmt-rust fmt-python fmt-frontend fmt-all lint-rust lint-python lint-frontend lint-all check run-daemon run-cli dev-shell update-deps bench-rust bench-python clean

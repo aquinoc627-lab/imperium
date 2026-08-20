@@ -8,6 +8,8 @@ on:
       - "crates/imperium-core/**"
       - "crates/imperium-cli/**"
       - "Cargo.toml"
+      - "scripts/v0-smoke.sh"
+      - "justfile"
       - ".github/workflows/v0.yaml"
   pull_request:
     branches: [master, main]
@@ -16,6 +18,8 @@ on:
       - "crates/imperium-core/**"
       - "crates/imperium-cli/**"
       - "Cargo.toml"
+      - "scripts/v0-smoke.sh"
+      - "justfile"
       - ".github/workflows/v0.yaml"
   workflow_dispatch:
 
@@ -40,3 +44,4 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test -p imperium-core --lib
       - run: cargo test -p imperium-cli
+      - run: bash scripts/v0-smoke.sh

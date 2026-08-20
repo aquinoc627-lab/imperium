@@ -4,13 +4,12 @@
 //! Each capability is a WASM component with declared permissions.
 
 use crate::crypto::Hash;
-use crate::policy::PolicyId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Unique capability identifier
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CapabilityId(pub Uuid);
 
 impl CapabilityId {
@@ -32,7 +31,7 @@ impl std::fmt::Display for CapabilityId {
 }
 
 /// Capability manifest - declares what the capability can do
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityManifest {
     /// Unique identifier
     pub id: CapabilityId,
@@ -71,7 +70,7 @@ pub struct CapabilityManifest {
 }
 
 /// What capabilities this component declares it needs
-#[derive(Debug, Clone, Default, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DeclaredCapabilities {
     /// Network access (host:port patterns)
     pub network: Vec<NetworkCapability>,
@@ -89,7 +88,7 @@ pub struct DeclaredCapabilities {
     pub custom: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkCapability {
     pub host_pattern: String,  // e.g., "api.github.com", "*.example.com"
     pub port: Option<u16>,     // None = any
@@ -98,7 +97,7 @@ pub struct NetworkCapability {
     pub description: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NetworkProtocol {
     TCP,
     UDP,
@@ -108,14 +107,14 @@ pub enum NetworkProtocol {
     GRPC,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultCapability {
     pub path_pattern: String,  // e.g., "notes/*", "projects/secret/*"
     pub permissions: Vec<VaultPermission>,
     pub description: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VaultPermission {
     Read,
     Write,
@@ -125,7 +124,7 @@ pub enum VaultPermission {
     Admin,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShellCapability {
     pub command: String,        // e.g., "git", "gh", "kubectl"
     pub args_pattern: Vec<String>, // Patterns like ["commit", "-m", "*"]
@@ -134,21 +133,21 @@ pub struct ShellCapability {
     pub description: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecretCapability {
     pub name: String,           // e.g., "GITHUB_TOKEN", "AWS_SECRET_KEY"
     pub description: String,
     pub required: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FilesystemCapability {
     pub path: String,
     pub permissions: Vec<FilesystemPermission>,
     pub description: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FilesystemPermission {
     Read,
     Write,
@@ -157,7 +156,7 @@ pub enum FilesystemPermission {
     Delete,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceLimits {
     pub max_cpu_ms_per_invocation: u64,
     pub max_memory_bytes: u64,
@@ -181,7 +180,7 @@ impl Default for ResourceLimits {
 }
 
 /// Dependency on another capability
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityDependency {
     pub capability_id: CapabilityId,
     pub version_range: String, // semver range
@@ -189,7 +188,7 @@ pub struct CapabilityDependency {
 }
 
 /// Unforgeable capability token issued at runtime
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityToken {
     /// Token ID
     pub id: TokenId,
@@ -211,7 +210,7 @@ pub struct CapabilityToken {
     pub signature: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TokenId(pub Uuid);
 
 impl TokenId {
@@ -227,7 +226,7 @@ impl Default for TokenId {
 }
 
 /// Granted permissions (validated subset of declared)
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GrantedPermissions {
     pub network: Vec<NetworkCapability>,
     pub vault: Vec<VaultCapability>,
@@ -239,7 +238,7 @@ pub struct GrantedPermissions {
 }
 
 /// Capability registry entry
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegistryEntry {
     pub manifest: CapabilityManifest,
     pub wasm_bytes: Vec<u8>, // Stored separately in production
@@ -249,7 +248,7 @@ pub struct RegistryEntry {
     pub verification: VerificationStatus,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CapabilityStatus {
     Available,
     Deprecated,
@@ -258,7 +257,7 @@ pub enum CapabilityStatus {
     Removed,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VerificationStatus {
     Unverified,
     Verified,

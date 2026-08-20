@@ -8,14 +8,26 @@ IMPERIUM compiles natural-language goals into an Intent IR, simulates, issues a 
 
 ## Run the v0 slice
 
-Node 22+:
+Node 22+ (kernel tests):
 
 ```bash
 cd web/v0
 npm test
 ```
 
-That exercises: compile → simulate → HMAC token → WASM guest → event-log fold.
+Rust CLI (same loop, local `.imperium/` store):
+
+```bash
+cargo test -p imperium-core --lib
+cargo run -p imperium-cli -- init
+cargo run -p imperium-cli -- intent compile --input "Echo this message: ping"
+cargo run -p imperium-cli -- intent simulate --intent-id <id>
+cargo run -p imperium-cli -- intent approve --intent-id <id>
+cargo run -p imperium-cli -- intent execute --intent-id <id>
+cargo run -p imperium-cli -- intent replay --intent-id <id>
+```
+
+`Write file ../secret with contents x` is rejected. Network is deny-all. Execute without approve, or after revoke, fails.
 
 Canonical intents:
 
@@ -30,7 +42,7 @@ Write file notes.txt with contents hello
 
 | Area | Status |
 |------|--------|
-| v0 loop (`web/v0`) | **Working** — phases 1–6 |
+| v0 loop (`web/v0` + `imperium-cli`) | **Working** — phases 1–6 |
 | Intent IR types (Rust + Python) | Usable — shared schema + fixtures |
 | Rules compiler / tokens / WASM / replay | **Working in `web/v0`**, not yet in Rust |
 | CLI / daemon / frontend workbench | Scaffold or mock |

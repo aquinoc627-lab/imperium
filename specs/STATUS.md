@@ -10,7 +10,7 @@ The v0 vertical slice is implemented in [`web/v0`](../web/v0). That is the sourc
 | 3 | `cap.write` under `scratch/` | Done (`scratch.ts`). |
 | 4 | WASM guest + host imports | Done (`wasm-host.ts`, `guest.wat`). |
 | 5 | Propose then rules | Done locally (`propose.ts`). Optional remote model is app-only. |
-| 6 | Event-log fold is truth | Done (`replay.ts`). |
+| CLI v0 verbs | Done in `imperium-cli` (`intent compile|simulate|approve|execute|list|replay`). Store is `.imperium/`. Other CLI verbs removed / fail closed. |
 
 ## Still scaffolding
 

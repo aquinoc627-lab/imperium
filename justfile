@@ -17,7 +17,15 @@ build-frontend:
 
 build-all: build-rust build-python build-frontend
 
-# --- Test ---
+# v0 slice (working product)
+test-v0-js:
+	cd web/v0 && node --experimental-strip-types --test src/*.test.ts
+
+test-v0-rust:
+	cargo test -p imperium-core --lib v0
+
+test-v0: test-v0-js test-v0-rust
+
 test-rust:
 	cargo nextest run --workspace
 

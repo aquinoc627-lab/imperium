@@ -1,14 +1,10 @@
-//! IMPERIUM Core Types
-//!
-//! The self-synthesizing intent runtime.
-//! Local. Sovereign. Absolute.
-
 pub mod intent;
 pub mod event;
 pub mod capability;
 pub mod policy;
 pub mod crypto;
 pub mod error;
+pub mod v0;
 
 pub use intent::*;
 pub use event::*;

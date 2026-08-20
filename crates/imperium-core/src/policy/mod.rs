@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Unique policy identifier
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PolicyId(pub Uuid);
 
 impl PolicyId {
@@ -32,7 +32,7 @@ impl std::fmt::Display for PolicyId {
 }
 
 /// Policy bundle (Rego + data + metadata)
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicyBundle {
     pub id: PolicyId,
     pub name: String,
@@ -54,7 +54,7 @@ pub struct PolicyBundle {
 }
 
 /// Policy evaluation request
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationRequest {
     pub policy_id: PolicyId,
     pub input: serde_json::Value,
@@ -62,7 +62,7 @@ pub struct EvaluationRequest {
 }
 
 /// Context for policy evaluation
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationContext {
     pub actor: ActorId,
     pub intent_id: Option<crate::intent::IntentId>,
@@ -73,7 +73,7 @@ pub struct EvaluationContext {
 }
 
 /// Policy decision
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Decision {
     pub policy_id: PolicyId,
     pub decision: DecisionType,
@@ -85,7 +85,7 @@ pub struct Decision {
     pub trace: Option<Vec<TraceEntry>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DecisionType {
     Allow,
     Deny,
@@ -94,14 +94,14 @@ pub enum DecisionType {
 }
 
 /// Trace entry for debugging
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraceEntry {
     pub rule: String,
     pub result: serde_json::Value,
     pub location: Option<SourceLocation>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SourceLocation {
     pub file: String,
     pub row: u32,
@@ -109,7 +109,7 @@ pub struct SourceLocation {
 }
 
 /// Policy set (multiple policies evaluated together)
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicySet {
     pub id: PolicySetId,
     pub name: String,
@@ -119,7 +119,7 @@ pub struct PolicySet {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PolicySetId(pub Uuid);
 
 impl PolicySetId {
@@ -135,7 +135,7 @@ impl Default for PolicySetId {
 }
 
 /// How to combine multiple policy decisions
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvaluationStrategy {
     /// First deny wins (default)
     DenyOverrides,

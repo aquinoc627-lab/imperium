@@ -54,7 +54,7 @@ pre{overflow:auto;font-size:.75rem;background:var(--elevated);border:1px solid v
     <section class="card">
       <div class="row"><h1>Compose</h1><span class="mono muted">propose · rules · wasm</span></div>
       <textarea id="nl">Echo this message: ping</textarea>
-      <p class="hint">Strict: Echo this message: &lt;text&gt; · Write file &lt;path&gt; with contents &lt;text&gt;<br>Propose accepts looser phrasing like “say hello”.</p>
+      <p class="hint">Strict: Echo this message: <text> · Write file <path> with contents <text><br>Propose accepts looser phrasing like “say hello”.</p>
       <div class="actions">
         <button id="btn-compile">Compile</button>
         <button class="secondary" id="btn-propose">Propose</button>
@@ -72,6 +72,6 @@ pre{overflow:auto;font-size:.75rem;background:var(--elevated);border:1px solid v
   </aside>
 </div>
 <div class="toast" id="toast" hidden></div>
-<script type="module" src="./app.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>

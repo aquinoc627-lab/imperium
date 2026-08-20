@@ -8,6 +8,14 @@ This project follows the [Contributor Covenant](https://www.contributor-covenant
 
 Read [AGENTS.md](AGENTS.md) and [specs/v0-slice.md](specs/v0-slice.md) before adding surface area.
 
+After clone, the only required check is:
+
+```bash
+just v0
+```
+
+Do not add crates, UI pages, or spec `02`–`04` work until that stays green.
+
 ## Development Setup
 
 ### Using Nix (Recommended)

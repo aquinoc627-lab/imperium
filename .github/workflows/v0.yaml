@@ -3,15 +3,25 @@ name: v0 slice
 on:
   push:
     branches: [master, main]
-    paths: ["web/v0/**", ".github/workflows/v0.yaml"]
+    paths:
+      - "web/v0/**"
+      - "crates/imperium-core/**"
+      - "crates/imperium-cli/**"
+      - "Cargo.toml"
+      - ".github/workflows/v0.yaml"
   pull_request:
     branches: [master, main]
-    paths: ["web/v0/**", ".github/workflows/v0.yaml"]
+    paths:
+      - "web/v0/**"
+      - "crates/imperium-core/**"
+      - "crates/imperium-cli/**"
+      - "Cargo.toml"
+      - ".github/workflows/v0.yaml"
   workflow_dispatch:
 
 jobs:
-  test:
-    name: v0 tests
+  js:
+    name: v0 js
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,3 +30,13 @@ jobs:
           node-version: 22
       - run: npm test
         working-directory: web/v0
+
+  rust:
+    name: v0 rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p imperium-core --lib
+      - run: cargo test -p imperium-cli

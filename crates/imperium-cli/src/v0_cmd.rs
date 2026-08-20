@@ -337,3 +337,50 @@ pub fn resolve_nl(input: &str) -> Result<String> {
         Ok(input.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp_home() -> V0Home {
+        let root = std::env::temp_dir().join(format!("imperium-v0-{}", uuid::Uuid::new_v4()));
+        let home = V0Home { root };
+        home.init().unwrap();
+        home
+    }
+
+    #[test]
+    fn write_creates_scratch_file() {
+        let home = tmp_home();
+        let rec = home
+            .compile("Write file notes.txt with contents hello-from-cli", false)
+            .unwrap();
+        let id = rec.ir.id.to_string();
+        home.simulate(&id).unwrap();
+        home.approve(&id).unwrap();
+        let rec = home.execute(&id).unwrap();
+        assert_eq!(rec.status, IntentStatus::Executed);
+        let path = home.root.join("scratch/notes.txt");
+        assert_eq!(fs::read_to_string(path).unwrap(), "hello-from-cli");
+    }
+
+    #[test]
+    fn write_escape_never_compiles() {
+        let home = tmp_home();
+        assert!(home
+            .compile("Write file ../secret with contents x", false)
+            .is_err());
+        assert!(!home.root.join("secret").exists());
+    }
+
+    #[test]
+    fn execute_without_approve_is_rejected() {
+        let home = tmp_home();
+        let rec = home
+            .compile("Echo this message: ping", false)
+            .unwrap();
+        let id = rec.ir.id.to_string();
+        assert!(home.execute(&id).is_err());
+    }
+}
+

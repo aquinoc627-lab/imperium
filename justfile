@@ -22,7 +22,8 @@ test-v0-js:
 	cd web/v0 && node --experimental-strip-types --test src/*.test.ts
 
 test-v0-rust:
-	cargo test -p imperium-core --lib v0
+	cargo test -p imperium-core --lib
+	cargo test -p imperium-cli
 
 test-v0: test-v0-js test-v0-rust
 

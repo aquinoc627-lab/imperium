@@ -10,11 +10,12 @@ The v0 vertical slice is implemented in [`web/v0`](../web/v0). That is the sourc
 | 3 | `cap.write` under `scratch/` | Done (`scratch.ts`). |
 | 4 | WASM guest + host imports | Done (`wasm-host.ts`, `guest.wat`). |
 | 5 | Propose then rules | Done locally (`propose.ts`). Optional remote model is app-only. |
-| CLI v0 verbs | Done in `imperium-cli` (`intent compile|simulate|approve|execute|list|replay`). Store is `.imperium/`. Other CLI verbs removed / fail closed. |
+| 6 | Event-log fold is truth | Done (`replay.ts` + CLI `intent replay`). |
+| CLI | v0 verbs on disk | `imperium-cli` compile/simulate/approve/execute/revoke/replay. `cap.write` creates `.imperium/scratch/<file>`. |
 
 ## Still scaffolding
 
-- Rust runtime / CLI / daemon / store / sync / voice
+- Rust runtime / daemon / store / sync / voice (CLI v0 is real)
 - Python packages other than IR models
 - `frontend/workbench` (mock UI)
 - Specs `02`–`04` (do not implement yet)

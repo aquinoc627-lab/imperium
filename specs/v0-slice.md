@@ -1,63 +1,51 @@
 # IMPERIUM v0 slice (normative)
 
-This is the only product that may be implemented until Phase 4 exit.
-Specs `02`–`04` are aspirational and must not grow code until this slice works.
+Implemented in [`web/v0`](../web/v0). Specs `02`–`04` stay aspirational.
 
-## Allowed intent
+## Allowed intents
 
-Natural language is compiled by a **rules/template compiler** (no LLM in v0):
+Rules compiler (always the gate):
 
 ```
 Echo this message: <text>
-```
-
-Optional later (still Phase 1, still no LLM):
-
-```
 Write file <path> with contents <text>
 ```
 
-`<path>` must resolve inside a scratch directory. No workspace mutation.
+`<path>` must resolve under `scratch/`. `..`, `.`, and absolute paths are denied.
 
-## Allowed capability
+A local proposer may map looser phrasing (`say hello`, `save notes.txt with hi`) to those forms. A model may propose only `{echo|write|reject}`. Rules still decide.
 
-- Name: `cap.echo`
-- Effect: return the message text (or write it to scratch)
-- Permissions: no network, no shell, no secrets
-- Implementation: host-enforced stub is acceptable until WASM wiring is real
+## Capabilities
 
-Unknown capabilities are denied.
+| Name | Effect | Permissions |
+|------|--------|-------------|
+| `cap.echo` | return the message | no FS, no net, no env |
+| `cap.write` | persist under `scratch/` | FS prefix `scratch/` only |
 
-## Simulation (trivial)
+Unknown capabilities are denied. Network is always deny-all.
 
-Not Monte Carlo. Static planner only:
+Implementation: a WASM guest with host imports `echo` and `write`. Imports refuse the call if the token does not grant them.
+
+## Simulation
+
+Static planner only:
 
 | Field | Rule |
 |-------|------|
-| `success_probability` | `1.0` if every task capability is `cap.echo`, else `0.0` |
-| `risk_score` / sim risk | `0.0` if capability present, else `1.0` |
-| duration | sum of `estimated_duration_ms` or retry defaults |
-| cost | omit (no cost model) |
+| `success_probability` | `1` if every task capability is known, else `0` |
+| `risk` | `0` if known, else `1` |
+| `duration_ms` | sum of `estimated_duration_ms` |
 
 ## Execution rules
 
-1. Compile → validate IR (schema + DAG + version = 1).
-2. Simulate.
-3. `execute` without `approve` is rejected.
-4. Append events: `IntentCompiled`, `IntentSimulated`, `IntentApproved`, `TaskStarted`, `TaskSucceeded` or `TaskFailed`.
-5. Replay by `intent_id` reproduces the same terminal state.
+1. Compile (or propose-then-compile) → IR version 1.
+2. Simulate. High-risk / unknown cap cannot be approved.
+3. Approve issues a one-shot HMAC-SHA256 token (nonce, expiry, subset permissions).
+4. Execute without approve, with a bad/expired/reused/revoked token, or with a capability mismatch is rejected.
+5. Replay folds the event log. The fold is the source of truth.
 
-## CLI verbs that may become real
+Events: `IntentProposed?`, `IntentCompiled`, `IntentSimulated`, `IntentApproved`, `TokenIssued`, `TokenRevoked?`, `TaskStarted`, `TaskSucceeded` | `TaskFailed`, `IntentReplayed`.
 
-- `imperium intent compile`
-- `imperium intent simulate`
-- `imperium intent approve`
-- `imperium intent execute`
-- `imperium intent list`
+## Out of scope until this stays green
 
-All other commands stay unimplemented.
-
-## Out of scope
-
-Evolution loop, P2P sync, voice, OPA/Rego embedding, OpenAPI→WASM synthesis,
-TPM/IMA, plugin marketplace, 10k rollouts, frontend work beyond displaying real store state.
+Evolution loop, P2P sync, voice, OPA/Rego, OpenAPI→WASM synthesis, TPM/IMA, plugin marketplace, mock frontend pages that are not store-backed.

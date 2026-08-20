@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Unique event identifier (ULID for time-ordered uniqueness)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EventId(pub ulid::Ulid);
 
 impl EventId {
@@ -34,7 +34,7 @@ impl std::fmt::Display for EventId {
 }
 
 /// Event envelope with metadata
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {
     /// Unique event ID
     pub id: EventId,
@@ -85,13 +85,13 @@ impl Event {
     }
 
     pub fn compute_hash(&mut self) {
-        let payload_bytes = postcard::to_stdvec(&self.payload).expect("payload serializable");
+        let payload_bytes = postcard::to_allocvec(&self.payload).expect("payload serializable");
         self.payload_hash = Some(Hash::blake3(&payload_bytes));
     }
 
     pub fn verify(&self) -> bool {
         if let Some(hash) = &self.payload_hash {
-            let payload_bytes = postcard::to_stdvec(&self.payload).expect("payload serializable");
+            let payload_bytes = postcard::to_allocvec(&self.payload).expect("payload serializable");
             *hash == Hash::blake3(&payload_bytes)
         } else {
             false
@@ -100,7 +100,7 @@ impl Event {
 }
 
 /// Event type for routing and filtering
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EventType {
     // Intent lifecycle
     IntentCreated,
@@ -167,7 +167,7 @@ pub enum EventType {
 }
 
 /// Event payloads (discriminated union)
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum EventPayload {
     IntentCreated { intent_id: IntentId, name: String, nl_source: String },
@@ -226,7 +226,7 @@ pub enum EventPayload {
 }
 
 /// Actor that initiates events
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Actor {
     pub id: ActorId,
     pub kind: ActorKind,
@@ -234,7 +234,7 @@ pub struct Actor {
     pub metadata: HashMap<String, String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActorKind {
     User,
     System,
@@ -248,7 +248,7 @@ pub enum ActorKind {
 }
 
 /// Actor identifier
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ActorId(pub Uuid);
 
 impl ActorId {
@@ -264,7 +264,7 @@ impl Default for ActorId {
 }
 
 /// Event stream for a specific aggregate (intent, capability, etc.)
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventStream {
     pub aggregate_id: String,
     pub aggregate_type: AggregateType,
@@ -273,7 +273,7 @@ pub struct EventStream {
     pub version: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AggregateType {
     Intent,
     Capability,

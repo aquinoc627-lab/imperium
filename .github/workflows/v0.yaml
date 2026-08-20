@@ -1,0 +1,22 @@
+name: v0 slice
+
+on:
+  push:
+    branches: [master, main]
+    paths: ["web/v0/**", ".github/workflows/v0.yaml"]
+  pull_request:
+    branches: [master, main]
+    paths: ["web/v0/**", ".github/workflows/v0.yaml"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: v0 tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+        working-directory: web/v0

@@ -261,6 +261,8 @@ pub struct Task {
     #[serde(default)]
     pub estimated_duration_ms: Option<u64>,
     #[serde(default)]
+    pub target_path: Option<String>,
+    #[serde(default)]
     pub retry_policy: RetryPolicy,
     #[serde(default)]
     pub compensation: Option<CompensationAction>,
@@ -391,6 +393,7 @@ mod tests {
                 capabilities: vec!["cap.echo".into()],
                 dependencies: vec![b],
                 estimated_duration_ms: None,
+                target_path: None,
                 retry_policy: RetryPolicy::default(),
                 compensation: None,
             },
@@ -402,6 +405,7 @@ mod tests {
                 capabilities: vec!["cap.echo".into()],
                 dependencies: vec![a],
                 estimated_duration_ms: None,
+                target_path: None,
                 retry_policy: RetryPolicy::default(),
                 compensation: None,
             },

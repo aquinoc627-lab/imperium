@@ -1,365 +1,151 @@
-//! IMPERIUM CLI
+//! IMPERIUM CLI — v0 intent loop is real; other verbs fail closed.
 
+mod v0_cmd;
+
+use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
-use imperium_core::*;
-use tracing_subscriber::{EnvFilter, fmt};
-use anyhow::Result;
+use tracing_subscriber::{fmt, EnvFilter};
+use v0_cmd::{resolve_nl, V0Home};
 
 #[derive(Parser)]
 #[command(name = "imperium")]
-#[command(about = "IMPERIUM - The Self-Synthesizing Intent Runtime", long_about = None)]
+#[command(about = "IMPERIUM v0 — compile, simulate, approve, execute, replay")]
 #[command(version)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-    
     #[arg(short, long, global = true)]
     verbose: bool,
-    
-    #[arg(short, long, global = true)]
-    config: Option<String>,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Initialize IMPERIUM (download models, setup vault, calibrate voice)
-    Init {
-        #[arg(long)]
-        skip_models: bool,
-        #[arg(long)]
-        skip_voice: bool,
-    },
-    
-    /// Intent management
+    /// Create .imperium store (no model download)
+    Init,
+    /// Intent management (v0)
     Intent {
         #[command(subcommand)]
         command: IntentCommands,
     },
-    
-    /// Start the daemon
-    Daemon {
-        #[arg(long)]
-        foreground: bool,
-    },
-    
-    /// Simulation commands
-    Simulate {
-        #[command(subcommand)]
-        command: SimulateCommands,
-    },
-    
-    /// Capability management
-    Capability {
-        #[command(subcommand)]
-        command: CapabilityCommands,
-    },
-    
-    /// World model inspection
-    World {
-        #[command(subcommand)]
-        command: WorldCommands,
-    },
-    
-    /// Vault operations
-    Vault {
-        #[command(subcommand)]
-        command: VaultCommands,
-    },
-    
-    /// Plugin marketplace
-    Plugin {
-        #[command(subcommand)]
-        command: PluginCommands,
-    },
-    
-    /// Team sync
-    Team {
-        #[command(subcommand)]
-        command: TeamCommands,
-    },
-    
-    /// Debugging tools
-    Debug {
-        #[command(subcommand)]
-        command: DebugCommands,
+    /// Replay from the event log
+    Replay {
+        #[arg(short, long)]
+        intent_id: String,
     },
 }
 
 #[derive(Subcommand)]
 enum IntentCommands {
-    /// Create new intent interactively
-    New {
-        #[arg(short, long)]
-        prompt: Option<String>,
-        #[arg(long)]
-        interactive: bool,
-    },
-    
-    /// Compile NL to IR
+    /// Compile NL (or a file) to IR
     Compile {
         #[arg(short, long)]
         input: String,
-        #[arg(short, long)]
-        output: Option<String>,
+        /// Map loose phrasing, then run the rules compiler
+        #[arg(long)]
+        propose: bool,
     },
-    
-    /// Simulate intent
     Simulate {
         #[arg(short, long)]
         intent_id: String,
-        #[arg(long, default_value = "10000")]
-        rollouts: u32,
-        #[arg(short, long)]
-        output: Option<String>,
     },
-    
-    /// Approve intent for execution
     Approve {
         #[arg(short, long)]
         intent_id: String,
-        #[arg(short, long)]
-        simulation: Option<String>,
     },
-    
-    /// Execute intent
     Execute {
         #[arg(short, long)]
         intent_id: String,
-        #[arg(long)]
-        branch: Option<String>,
     },
-    
-    /// List intents
-    List {
-        #[arg(long)]
-        status: Option<String>,
-    },
-}
-
-#[derive(Subcommand)]
-enum SimulateCommands {
-    /// Query counterfactual
-    Query {
-        #[arg(short, long)]
-        simulation: String,
-        #[arg(short, long)]
-        question: String,
-    },
-    
-    /// Compare strategies
-    Compare {
-        #[arg(long)]
-        baseline: String,
-        #[arg(long)]
-        strategies: Vec<String>,
-    },
-}
-
-#[derive(Subcommand)]
-enum CapabilityCommands {
-    /// Synthesize new capability
-    Synthesize {
-        #[arg(short, long)]
-        description: String,
-        #[arg(long)]
-        test: bool,
-    },
-    
-    /// Test capability
-    Test {
-        #[arg(short, long)]
-        capability: String,
-    },
-    
-    /// Publish capability
-    Publish {
-        #[arg(short, long)]
-        capability: String,
-    },
-}
-
-#[derive(Subcommand)]
-enum WorldCommands {
-    /// Inspect entity
-    Inspect {
-        #[arg(short, long)]
-        entity: String,
-        #[arg(long, default_value = "3")]
-        depth: u32,
-    },
-    
-    /// Show causal path
-    Path {
-        #[arg(short, long)]
-        from: String,
-        #[arg(short, long)]
-        to: String,
-    },
-}
-
-#[derive(Subcommand)]
-enum VaultCommands {
-    /// Search vault
-    Search {
-        #[arg(short, long)]
-        query: String,
-        #[arg(long)]
-        semantic: bool,
-    },
-    
-    /// Show graph
-    Graph {
-        #[arg(long)]
-        focus: Option<String>,
-        #[arg(long, default_value = "2")]
-        depth: u32,
-    },
-    
-    /// Sync with peer
-    Sync {
-        #[arg(short, long)]
-        peer: String,
-    },
-}
-
-#[derive(Subcommand)]
-enum PluginCommands {
-    /// Search plugins
-    Search {
-        #[arg(short, long)]
-        query: String,
-    },
-    
-    /// Install plugin
-    Install {
-        #[arg(short, long)]
-        plugin: String,
-    },
-    
-    /// Develop plugin (hot reload)
-    Dev {
-        #[arg(short, long)]
-        path: String,
-    },
-}
-
-#[derive(Subcommand)]
-enum TeamCommands {
-    /// Invite member
-    Invite {
-        #[arg(short, long)]
-        peer: String,
-        #[arg(long)]
-        role: String,
-    },
-    
-    /// Set policy
-    Policy {
-        #[arg(short, long)]
-        resource: String,
-        #[arg(long)]
-        read: Vec<String>,
-        #[arg(long)]
-        write: Vec<String>,
-    },
-    
-    /// Show presence
-    Presence {
-        #[arg(long)]
-        follow: bool,
-    },
-}
-
-#[derive(Subcommand)]
-enum DebugCommands {
-    /// Replay request
-    Replay {
-        #[arg(short, long)]
-        request_id: String,
-        #[arg(long)]
-        step_through: bool,
-    },
-    
-    /// Show trace
-    Trace {
-        #[arg(short, long)]
-        request_id: String,
-        #[arg(long)]
-        flamegraph: bool,
-    },
-    
-    /// Show state at time
-    State {
+    Revoke {
         #[arg(short, long)]
         intent_id: String,
-        #[arg(long)]
-        time: String,
     },
-    
-    /// Profile performance
-    Profile {
-        #[arg(long, default_value = "60")]
-        duration: u64,
+    List,
+    Replay {
         #[arg(short, long)]
-        output: Option<String>,
+        intent_id: String,
     },
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    
-    // Initialize logging
     let filter = if cli.verbose {
         EnvFilter::new("debug")
     } else {
         EnvFilter::new("info")
     };
-    
-    fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .init();
-    
-    // Execute command
+    fmt().with_env_filter(filter).with_target(false).init();
+
+    let home = V0Home::discover()?;
     match cli.command {
-        Commands::Init { skip_models, skip_voice } => {
-            println!("🚀 Initializing IMPERIUM...");
-            if !skip_models {
-                println!("📥 Downloading models...");
+        Commands::Init => {
+            home.init()?;
+            println!("initialized {}", home.root.display());
+        }
+        Commands::Replay { intent_id } => print_replay(&home, &intent_id)?,
+        Commands::Intent { command } => match command {
+            IntentCommands::Compile { input, propose } => {
+                let nl = resolve_nl(&input)?;
+                let rec = home.compile(&nl, propose)?;
+                println!("{}\t{}\t{}", rec.ir.id, rec.status, rec.ir.name);
             }
-            if !skip_voice {
-                println!("🎙️  Calibrating voice...");
+            IntentCommands::Simulate { intent_id } => {
+                let rec = home.simulate(&intent_id)?;
+                let sim = rec.simulation.expect("simulated");
+                println!(
+                    "{}\t{}\tsuccess={} risk={} duration_ms={}",
+                    rec.ir.id,
+                    rec.status,
+                    sim.success_probability,
+                    sim.risk,
+                    sim.duration_ms
+                );
             }
-            println!("✅ IMPERIUM ready!");
-        }
-        Commands::Intent { command } => {
-            println!("🎯 Intent command: {:?}", command);
-        }
-        Commands::Daemon { foreground } => {
-            println!("🚀 Starting daemon (foreground: {})", foreground);
-        }
-        Commands::Simulate { command } => {
-            println!("📊 Simulation command: {:?}", command);
-        }
-        Commands::Capability { command } => {
-            println!("🔧 Capability command: {:?}", command);
-        }
-        Commands::World { command } => {
-            println!("🌍 World command: {:?}", command);
-        }
-        Commands::Vault { command } => {
-            println!("💾 Vault command: {:?}", command);
-        }
-        Commands::Plugin { command } => {
-            println!("📦 Plugin command: {:?}", command);
-        }
-        Commands::Team { command } => {
-            println!("👥 Team command: {:?}", command);
-        }
-        Commands::Debug { command } => {
-            println!("🐛 Debug command: {:?}", command);
-        }
+            IntentCommands::Approve { intent_id } => {
+                let rec = home.approve(&intent_id)?;
+                let fp = rec
+                    .token
+                    .as_ref()
+                    .map(|t| t.token.signature.chars().take(12).collect::<String>())
+                    .unwrap_or_default();
+                println!("{}\t{}\ttoken={}", rec.ir.id, rec.status, fp);
+            }
+            IntentCommands::Execute { intent_id } => {
+                let rec = home.execute(&intent_id)?;
+                println!(
+                    "{}\t{}\t{}",
+                    rec.ir.id,
+                    rec.status,
+                    rec.output.unwrap_or_default()
+                );
+            }
+            IntentCommands::Revoke { intent_id } => {
+                let rec = home.revoke(&intent_id)?;
+                println!("{}\trevoked", rec.ir.id);
+            }
+            IntentCommands::List => {
+                for rec in home.list()? {
+                    println!("{}\t{}\t{}", rec.ir.id, rec.status, rec.ir.name);
+                }
+            }
+            IntentCommands::Replay { intent_id } => print_replay(&home, &intent_id)?,
+        },
     }
-    
+    Ok(())
+}
+
+fn print_replay(home: &V0Home, intent_id: &str) -> Result<()> {
+    let (rec, folded, matches) = home.replay(intent_id)?;
+    println!(
+        "{}\tstore={}\tfolded={:?}\tmatch={}\tevents={}",
+        rec.ir.id,
+        rec.status,
+        folded.status,
+        matches,
+        rec.events.len()
+    );
+    if !matches {
+        bail!("replay diverged from store snapshot");
+    }
     Ok(())
 }

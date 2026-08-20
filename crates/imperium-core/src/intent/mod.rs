@@ -1,16 +1,14 @@
 //! Intent Intermediate Representation (IR)
 //!
-//! The executable specification of user intent.
-//! Compiled from natural language, validated, simulated, then executed.
+//! Canonical types for protocol version 1. JSON contract:
+//! `schemas/intent_ir.schema.json`.
 
-use crate::event::EventId;
-use crate::crypto::Hash;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 /// Unique identifier for an intent
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct IntentId(pub Uuid);
 
 impl IntentId {
@@ -32,7 +30,7 @@ impl std::fmt::Display for IntentId {
 }
 
 /// Unique identifier for a task within an intent
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TaskId(pub Uuid);
 
 impl TaskId {
@@ -41,45 +39,44 @@ impl TaskId {
     }
 }
 
-/// The executable Intent IR - compiled from NL, ready for simulation/execution
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+impl std::fmt::Display for TaskId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Integrity hash of a canonical IR payload (BLAKE3, 32 bytes).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct IntentHash(pub [u8; 32]);
+
+/// The executable Intent IR.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntentIR {
-    /// Unique identifier
     pub id: IntentId,
-    /// Human-readable name
     pub name: String,
-    /// Natural language source
     pub nl_source: String,
-    /// The goal statement
     pub goal: Goal,
-    /// Constraints that must be satisfied
     pub constraints: Vec<Constraint>,
-    /// Success criteria (measurable)
     pub success_criteria: Vec<SuccessCriterion>,
-    /// Decomposed tasks (DAG)
     pub tasks: Vec<Task>,
-    /// Risk score [0.0, 1.0]
     pub risk_score: f32,
-    /// Whether human approval required before execution
     pub requires_approval: bool,
-    /// Protocol version
     pub version: u32,
-    /// Compilation timestamp
-    pub compiled_at: chrono::DateTime<chrono::Utc>,
-    /// Compiler version
-    pub compiler_version: String,
-    /// Hash of the IR for integrity
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compiled_at: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compiler_version: Option<String>,
+    /// Not part of the JSON contract; computed after validation.
     #[serde(skip)]
-    pub hash: Option<Hash>,
+    pub hash: Option<IntentHash>,
 }
 
 impl IntentIR {
-    /// Validate the IR structure
     pub fn validate(&self) -> Result<(), IntentValidationError> {
         if self.tasks.is_empty() {
             return Err(IntentValidationError::NoTasks);
         }
-        if self.risk_score < 0.0 || self.risk_score > 1.0 {
+        if !(0.0..=1.0).contains(&self.risk_score) {
             return Err(IntentValidationError::InvalidRiskScore(self.risk_score));
         }
         if self.version != crate::PROTOCOL_VERSION {
@@ -88,13 +85,20 @@ impl IntentIR {
                 found: self.version,
             });
         }
-        // Check task DAG for cycles
         self.validate_dag()?;
         Ok(())
     }
 
     fn validate_dag(&self) -> Result<(), IntentValidationError> {
-        use std::collections::HashSet;
+        let ids: HashSet<TaskId> = self.tasks.iter().map(|t| t.id).collect();
+        for task in &self.tasks {
+            for dep in &task.dependencies {
+                if !ids.contains(dep) {
+                    return Err(IntentValidationError::MissingDependency(*dep));
+                }
+            }
+        }
+
         let mut visited = HashSet::new();
         let mut rec_stack = HashSet::new();
 
@@ -109,13 +113,14 @@ impl IntentIR {
 
             if let Some(task) = tasks.iter().find(|t| t.id == task_id) {
                 for dep in &task.dependencies {
-                    if !visited.contains(dep) {
-                        visit(*dep, tasks, visited, rec_stack)?;
-                    } else if rec_stack.contains(dep) {
+                    if rec_stack.contains(dep) {
                         return Err(IntentValidationError::CyclicDependency {
                             task: task_id,
                             dependency: *dep,
                         });
+                    }
+                    if !visited.contains(dep) {
+                        visit(*dep, tasks, visited, rec_stack)?;
                     }
                 }
             }
@@ -132,24 +137,25 @@ impl IntentIR {
         Ok(())
     }
 
-    /// Compute hash of the IR
-    pub fn compute_hash(&mut self) -> Hash {
-        let bytes = postcard::to_stdvec(self).expect("IR serializable");
-        self.hash = Some(Hash::blake3(&bytes));
-        self.hash.unwrap()
+    /// Hash the JSON form of the IR (hash field excluded by serde skip).
+    pub fn compute_hash(&mut self) -> Result<IntentHash, IntentValidationError> {
+        let bytes = serde_json::to_vec(self).map_err(|e| {
+            IntentValidationError::InvalidTaskReference(e.to_string())
+        })?;
+        let hash = IntentHash(*blake3::hash(&bytes).as_bytes());
+        self.hash = Some(hash);
+        Ok(hash)
     }
 }
 
-/// High-level goal statement
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Goal {
     pub description: String,
     pub category: GoalCategory,
     pub priority: Priority,
 }
 
-/// Goal categories for routing and prioritization
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GoalCategory {
     CodeGeneration,
     Refactoring,
@@ -158,11 +164,10 @@ pub enum GoalCategory {
     Investigation,
     Automation,
     Analysis,
-    Custom(String),
+    Custom,
 }
 
-/// Priority levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Priority {
     Low = 0,
     Normal = 1,
@@ -170,17 +175,16 @@ pub enum Priority {
     Critical = 3,
 }
 
-/// Constraint that must be satisfied
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Constraint {
     pub id: String,
     pub kind: ConstraintKind,
+    #[serde(default)]
     pub parameters: HashMap<String, serde_json::Value>,
     pub severity: ConstraintSeverity,
 }
 
-/// Types of constraints
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConstraintKind {
     ZeroDowntime,
     BudgetLimit,
@@ -192,25 +196,27 @@ pub enum ConstraintKind {
     Custom,
 }
 
-/// Constraint severity
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConstraintSeverity {
-    Hard,    // Must satisfy
-    Soft,    // Should satisfy, penalty if not
-    Advisory, // Informational
+    Hard,
+    Soft,
+    Advisory,
 }
 
-/// Measurable success criterion
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SuccessCriterion {
     pub id: String,
     pub metric: Metric,
     pub threshold: Threshold,
-    pub weight: f32, // For composite scoring
+    #[serde(default = "default_weight")]
+    pub weight: f32,
 }
 
-/// Metrics that can be measured
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+fn default_weight() -> f32 {
+    1.0
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Metric {
     TestPassRate,
     LatencyP50,
@@ -222,18 +228,17 @@ pub enum Metric {
     CPUUsage,
     SecurityScore,
     ComplianceScore,
-    Custom(String),
+    Custom,
 }
 
-/// Threshold for a metric
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Threshold {
     pub operator: ThresholdOperator,
     pub value: f64,
     pub unit: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ThresholdOperator {
     LessThan,
     LessThanOrEqual,
@@ -243,22 +248,25 @@ pub enum ThresholdOperator {
     NotEqual,
 }
 
-/// A single task in the intent DAG
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub id: TaskId,
     pub name: String,
     pub description: String,
     pub kind: TaskKind,
-    pub capabilities: Vec<String>, // Required capability names
-    pub dependencies: Vec<TaskId>, // Must complete before this task
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+    #[serde(default)]
+    pub dependencies: Vec<TaskId>,
+    #[serde(default)]
     pub estimated_duration_ms: Option<u64>,
+    #[serde(default)]
     pub retry_policy: RetryPolicy,
-    pub compensation: Option<CompensationAction>, // For saga pattern
+    #[serde(default)]
+    pub compensation: Option<CompensationAction>,
 }
 
-/// Types of tasks
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskKind {
     Discovery,
     Design,
@@ -272,8 +280,7 @@ pub enum TaskKind {
     Custom,
 }
 
-/// Retry policy for task execution
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetryPolicy {
     pub max_attempts: u32,
     pub backoff_ms: u64,
@@ -294,15 +301,14 @@ impl Default for RetryPolicy {
     }
 }
 
-/// Compensation action for saga rollback
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompensationAction {
     pub action_type: CompensationType,
     pub target_task: TaskId,
     pub payload: serde_json::Value,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CompensationType {
     Undo,
     Reverse,
@@ -310,7 +316,6 @@ pub enum CompensationType {
     Notify,
 }
 
-/// Validation errors for Intent IR
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum IntentValidationError {
     #[error("Intent has no tasks")]
@@ -325,4 +330,92 @@ pub enum IntentValidationError {
     MissingDependency(TaskId),
     #[error("Invalid task reference: {0}")]
     InvalidTaskReference(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn fixture_dir() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/contract/intent_ir")
+    }
+
+    fn load(name: &str) -> IntentIR {
+        let path = fixture_dir().join(name);
+        let data = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!("failed to read {}: {e}", path.display())
+        });
+        serde_json::from_str(&data).expect("fixture deserializes")
+    }
+
+    #[test]
+    fn echo_v0_fixture_validates() {
+        let mut ir = load("echo_v0.json");
+        ir.validate().expect("echo_v0 valid");
+        ir.compute_hash().expect("hash");
+        assert_eq!(ir.tasks.len(), 1);
+        assert_eq!(ir.tasks[0].capabilities, vec!["cap.echo"]);
+        assert!(ir.requires_approval);
+    }
+
+    #[test]
+    fn simple_rest_api_fixture_validates() {
+        let ir = load("simple_rest_api.json");
+        ir.validate().expect("simple_rest_api valid");
+        assert_eq!(ir.tasks.len(), 4);
+    }
+
+    #[test]
+    fn missing_dependency_is_rejected() {
+        let mut ir = load("echo_v0.json");
+        ir.tasks[0].dependencies.push(TaskId(Uuid::nil()));
+        match ir.validate() {
+            Err(IntentValidationError::MissingDependency(_)) => {}
+            other => panic!("expected MissingDependency, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn cyclic_dependency_is_rejected() {
+        let mut ir = load("echo_v0.json");
+        let a = TaskId::new();
+        let b = TaskId::new();
+        ir.tasks = vec![
+            Task {
+                id: a,
+                name: "a".into(),
+                description: "a".into(),
+                kind: TaskKind::Custom,
+                capabilities: vec!["cap.echo".into()],
+                dependencies: vec![b],
+                estimated_duration_ms: None,
+                retry_policy: RetryPolicy::default(),
+                compensation: None,
+            },
+            Task {
+                id: b,
+                name: "b".into(),
+                description: "b".into(),
+                kind: TaskKind::Custom,
+                capabilities: vec!["cap.echo".into()],
+                dependencies: vec![a],
+                estimated_duration_ms: None,
+                retry_policy: RetryPolicy::default(),
+                compensation: None,
+            },
+        ];
+        match ir.validate() {
+            Err(IntentValidationError::CyclicDependency { .. }) => {}
+            other => panic!("expected CyclicDependency, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn empty_tasks_rejected() {
+        let mut ir = load("echo_v0.json");
+        ir.tasks.clear();
+        assert!(matches!(ir.validate(), Err(IntentValidationError::NoTasks)));
+    }
 }

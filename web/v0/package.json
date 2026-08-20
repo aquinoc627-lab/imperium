@@ -1,0 +1,12 @@
+{
+  "name": "@imperium/v0",
+  "private": true,
+  "type": "module",
+  "description": "Working IMPERIUM v0 slice: compile, simulate, token, wasm, replay.",
+  "scripts": {
+    "test": "node --experimental-strip-types --test src/*.test.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

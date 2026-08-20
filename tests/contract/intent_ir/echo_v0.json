@@ -1,0 +1,47 @@
+{
+  "id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+  "name": "Echo ping",
+  "nl_source": "Echo this message: ping",
+  "goal": {
+    "description": "Echo the text ping",
+    "category": "Automation",
+    "priority": "Normal"
+  },
+  "constraints": [],
+  "success_criteria": [
+    {
+      "id": "sc1",
+      "metric": "TestPassRate",
+      "threshold": {
+        "operator": "GreaterThanOrEqual",
+        "value": 1.0,
+        "unit": "ratio"
+      },
+      "weight": 1.0
+    }
+  ],
+  "tasks": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "name": "Echo",
+      "description": "Return the message ping",
+      "kind": "Custom",
+      "capabilities": ["cap.echo"],
+      "dependencies": [],
+      "estimated_duration_ms": 10,
+      "retry_policy": {
+        "max_attempts": 1,
+        "backoff_ms": 0,
+        "backoff_multiplier": 1.0,
+        "max_backoff_ms": 0,
+        "retryable_errors": []
+      },
+      "compensation": null
+    }
+  ],
+  "risk_score": 0.0,
+  "requires_approval": true,
+  "version": 1,
+  "compiled_at": "2026-08-19T21:00:00Z",
+  "compiler_version": "imperium-intent-rules-0.1.0"
+}

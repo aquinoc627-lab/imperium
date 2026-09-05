@@ -130,6 +130,9 @@ enum PolicyCommands {
         #[arg(short, long)]
         path: String,
     },
+    /// Run the policy test harness (Phase 15): evaluate each entry of
+    /// `.imperium/policy.tests.json` against the active policy and print PASS/FAIL
+    Test,
 }
 
 #[derive(Subcommand)]
@@ -197,6 +200,7 @@ fn main() -> Result<()> {
         Commands::Policy { command } => match command {
             PolicyCommands::Lint => policy_lint(&home)?,
             PolicyCommands::Explain { verb, path } => policy_explain(&home, &verb, &path)?,
+            PolicyCommands::Test => policy_test(&home)?,
         },
         Commands::Ledger { command } => match command {
             LedgerCommands::Stats => ledger_stats(&home)?,
@@ -577,6 +581,96 @@ fn policy_explain(home: &V0Home, verb: &str, path: &str) -> Result<()> {
         "verdict:   {}",
         if ok { "ALLOWED" } else { "DENIED (by grants)" }
     );
+    Ok(())
+}
+
+#[derive(serde::Deserialize)]
+struct PolicyTestEntry {
+    verb: String,
+    path: String,
+    expect: String,
+    #[serde(default)]
+    text: String,
+}
+
+fn policy_test(home: &V0Home) -> Result<()> {
+    use imperium_core::policy::imp::{self, PolicyDecision};
+
+    let test_path = home.root.join("policy.tests.json");
+    let data = if test_path.exists() {
+        std::fs::read_to_string(&test_path)?
+    } else {
+        println!("No .imperium/policy.tests.json found; skipping.");
+        return Ok(());
+    };
+    let entries: Vec<PolicyTestEntry> = serde_json::from_str(&data)?;
+
+    let policy = match home.load_policy() {
+        Ok(p) => p,
+        Err(e) => {
+            println!("policy:    unloadable ({e}); treating all as deny");
+            for entry in &entries {
+                println!(
+                    "FAIL {} {} (expected {}, got deny — policy unloadable)",
+                    entry.verb, entry.path, entry.expect
+                );
+            }
+            return Ok(());
+        }
+    };
+
+    let mut passed = 0;
+    let mut failed = 0;
+    for entry in &entries {
+        let verb = match entry.verb.as_str() {
+            "read" => "read",
+            "write" => "write",
+            "append" => "append",
+            "list" => "list",
+            "fetch" => "fetch",
+            _ => {
+                println!("FAIL {} {} (expected '{}', unknown verb)", entry.verb, entry.path, entry.expect);
+                failed += 1;
+                continue;
+            }
+        };
+        let resolved = imperium_core::v0::resolve_scratch_path(&entry.path);
+        let host = match &resolved {
+            Err(e) => e.to_string(),
+            Ok(p) if imperium_core::v0::is_sensitive_path(p) => {
+                imperium_core::v0::SENSITIVE_DENIED_REASON.to_string()
+            }
+            Ok(_) => "ok".to_string(),
+        };
+        let decision = match policy.as_ref().map(|p| p.evaluate(verb, &host, &entry.path)) {
+            Some(d) => d,
+            None => imperium_core::policy::imp::PolicyDecision::Allow { rule: None },
+        };
+        let got = match decision {
+            PolicyDecision::Allow { .. } => "allow",
+            PolicyDecision::Deny { .. } => "deny",
+            PolicyDecision::RequireApproval { .. } => "require_approval",
+        };
+        let expected = &entry.expect;
+        if got == expected {
+            println!("PASS {} {}", entry.verb, entry.path);
+            passed += 1;
+        } else {
+            println!(
+                "FAIL {} {} (expected {}, got {})",
+                entry.verb, entry.path, expected, got
+            );
+            failed += 1;
+        }
+    }
+
+    println!(
+        "policy test: {} passed, {} failed",
+        passed, failed
+    );
+    if failed > 0 {
+        std::process::exit(1);
+    }
     Ok(())
 }
 

@@ -49,6 +49,11 @@ enum Commands {
         #[command(subcommand)]
         command: FormsCommands,
     },
+    /// Audited recurring execution (Phase 16)
+    Schedule {
+        #[command(subcommand)]
+        command: ScheduleCommands,
+    },
     /// Search the ledger (name, source, output)
     Search { query: String },
     /// Full trace of one intent: IR → simulation → token → events → outcome
@@ -97,6 +102,37 @@ enum FormsCommands {
     },
     /// List forms with their run/verified counts (a view over the ledger)
     List,
+}
+#[derive(Subcommand)]
+enum ScheduleCommands {
+    /// Add a new recurring schedule
+    Add {
+        #[arg(short, long)]
+        form: String,
+        #[arg(short, long)]
+        slot: String,
+        #[arg(short, long)]
+        every: u64,
+    },
+    /// Remove a schedule
+    Remove {
+        #[arg(short, long)]
+        name: String,
+    },
+    /// Pause a schedule
+    Pause {
+        #[arg(short, long)]
+        name: String,
+    },
+    /// Resume a schedule
+    Resume {
+        #[arg(short, long)]
+        name: String,
+    },
+    /// List all schedules with next run status
+    List,
+    /// Run all due schedules (one-shot, no daemon)
+    Tick,
 }
 
 #[derive(Subcommand)]
@@ -276,6 +312,14 @@ fn main() -> Result<()> {
                     println!("{name}	runs={runs}	verified={verified}{badge}");
                 }
             }
+        },
+        Commands::Schedule { command } => match command {
+            ScheduleCommands::Add { form, slot, every } => {},
+            ScheduleCommands::Remove { name } => {},
+            ScheduleCommands::Pause { name } => {},
+            ScheduleCommands::Resume { name } => {},
+            ScheduleCommands::List => {},
+            ScheduleCommands::Tick => {},
         },
         Commands::Intent { command } => match command {
             IntentCommands::Compile { input, propose } => {
@@ -725,3 +769,21 @@ fn print_replay(home: &V0Home, intent_id: &str) -> Result<()> {
     }
     Ok(())
 }
+fn schedule_add(_home: &V0Home, _form: &str, _slot: &str, _every: u64) -> () {
+}
+
+fn schedule_remove(_home: &V0Home, _name: &str) -> () {
+}
+
+fn schedule_pause(_home: &V0Home, _name: &str) -> () {
+}
+
+fn schedule_resume(_home: &V0Home, _name: &str) -> () {
+}
+
+fn schedule_list(_home: &V0Home) -> () {
+}
+
+fn schedule_tick(_home: &V0Home) -> () {
+}
+

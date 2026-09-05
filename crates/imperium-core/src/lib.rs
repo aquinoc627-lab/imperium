@@ -5,6 +5,7 @@ pub mod policy;
 pub mod crypto;
 pub mod error;
 pub mod v0;
+pub mod wasm;
 
 pub use intent::*;
 pub use event::*;

@@ -2,7 +2,6 @@
 node_modules/
 python/.venv/
 target/
-Cargo.lock
 
 # Build outputs
 dist/
@@ -69,3 +68,6 @@ models/
 # Nix
 result
 result-*
+
+# Local v0 store (token secret lives here)
+.imperium/

@@ -9,6 +9,7 @@ on:
       - "crates/imperium-cli/**"
       - "Cargo.toml"
       - "scripts/v0-smoke.sh"
+      - "tests/contract/v0/**"
       - "justfile"
       - ".github/workflows/v0.yaml"
   pull_request:
@@ -19,6 +20,7 @@ on:
       - "crates/imperium-cli/**"
       - "Cargo.toml"
       - "scripts/v0-smoke.sh"
+      - "tests/contract/v0/**"
       - "justfile"
       - ".github/workflows/v0.yaml"
   workflow_dispatch:

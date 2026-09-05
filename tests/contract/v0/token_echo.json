@@ -1,0 +1,15 @@
+{
+  "secret": "test-secret",
+  "canonical_payload": "{\"capability\":\"cap.echo\",\"expires_at\":1060000,\"id\":\"00000000-0000-4000-8000-000000000001\",\"intent_id\":\"00000000-0000-4000-8000-000000000002\",\"issued_at\":1000000,\"nonce\":\"00000000-0000-4000-8000-000000000003\",\"permissions\":{\"env\":[],\"fs\":[],\"net\":[]},\"subject\":\"tester\"}",
+  "token": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "capability": "cap.echo",
+    "subject": "tester",
+    "intent_id": "00000000-0000-4000-8000-000000000002",
+    "permissions": { "fs": [], "net": [], "env": [] },
+    "nonce": "00000000-0000-4000-8000-000000000003",
+    "issued_at": 1000000,
+    "expires_at": 1060000,
+    "signature": "036b264ed870abff24970ac0e26a7521e92f54345a6caafd5d6313153813c572"
+  }
+}

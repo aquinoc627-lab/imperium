@@ -7,4 +7,5 @@ You are an implementer, not an architect.
 - No network in compiler/runtime/tests.
 - Allowed product until Phase 4: see `specs/v0-slice.md`.
 - IR contract: `schemas/intent_ir.schema.json` plus `tests/contract/intent_ir/`.
+- Token contract: `tests/contract/v0/` must verify in both Rust and JS.
 - If blocked, stop. Do not invent evolution, P2P, voice, OPA, TPM, or synthesis.

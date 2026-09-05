@@ -39,4 +39,11 @@ if "$BIN" intent compile --input "Write file ../secret with contents x" >/dev/nu
   exit 1
 fi
 
-echo "v0 smoke ok  echo=$echo_id  write=$write_id"
+read_line="$("$BIN" intent compile --input "Read file notes.txt")"
+read_id="$(printf '%s\n' "$read_line" | awk '{print $1}')"
+"$BIN" intent simulate --intent-id "$read_id"
+"$BIN" intent approve --intent-id "$read_id"
+read_out="$("$BIN" intent execute --intent-id "$read_id")"
+printf '%s\n' "$read_out" | grep -q hello-from-v0
+
+echo "v0 smoke ok  echo=$echo_id  write=$write_id  read=$read_id"

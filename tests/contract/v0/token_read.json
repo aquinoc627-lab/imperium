@@ -1,0 +1,14 @@
+{
+  "secret": "test-secret",
+  "token": {
+    "id": "00000000-0000-4000-8000-000000000021",
+    "capability": "cap.read",
+    "subject": "tester",
+    "intent_id": "00000000-0000-4000-8000-000000000022",
+    "permissions": { "fs": ["scratch"], "net": [], "env": [] },
+    "nonce": "00000000-0000-4000-8000-000000000023",
+    "issued_at": 1000000,
+    "expires_at": 1060000,
+    "signature": "47519aee26f4c2c2bfe65afe98c7c4d7e9db9faedd36c6fccdea6a4213fb5557"
+  }
+}

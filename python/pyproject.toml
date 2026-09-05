@@ -2,7 +2,6 @@
 name = "imperium"
 version = "0.1.0-dev"
 description = "IMPERIUM Python Components"
-readme = "README.md"
 license = {text = "BSL-1.0"}
 requires-python = ">=3.12"
 dependencies = [
@@ -14,7 +13,7 @@ dependencies = [
     "aiosqlite>=0.19",
     "redis>=5.0",
     "httpx>=0.27",
-    "openapi-pydantic>=1.24",
+    "openapi-pydantic>=0.5",
     "jinja2>=3.1",
     "pyyaml>=6.0",
     "click>=8.1",
@@ -70,6 +69,19 @@ dev-dependencies = [
     "ruff>=0.4",
     "mypy>=1.10",
     "jsonschema>=4.21",
+]
+
+[tool.setuptools]
+packages = [
+    "imperium_api",
+    "imperium_mcp",
+    "imperium_voice",
+    "imperium_memory",
+    "imperium_intent",
+    "imperium_router",
+    "imperium_synthesis",
+    "imperium_evolution",
+    "imperium_simulation",
 ]
 
 [tool.ruff]

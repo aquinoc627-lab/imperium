@@ -12,6 +12,9 @@ path = "src/main.rs"
 
 [dependencies]
 imperium-core = { path = "../imperium-core" }
+imperium-store = { path = "../imperium-store" }
+ureq = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

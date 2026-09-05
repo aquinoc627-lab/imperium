@@ -60,11 +60,15 @@ export function foldEvents(events: FoldedEvent[]): FoldedState {
         const notes = Array.isArray(p.notes)
           ? p.notes.map((n) => String(n))
           : [];
+        const effects_preview = Array.isArray(p.effects_preview)
+          ? (p.effects_preview as SimulationResult["effects_preview"])
+          : [];
         state.simulation = {
           success_probability: Number(p.success_probability ?? 0),
           risk: Number(p.risk ?? 0),
           duration_ms: Number(p.duration_ms ?? 0),
           notes,
+          effects_preview,
         };
         break;
       }
@@ -82,11 +86,14 @@ export function foldEvents(events: FoldedEvent[]): FoldedState {
         if (state.token) state.token.revoked = true;
         break;
       case "TaskSucceeded":
+        // Shadow executions are provenance, not state transitions.
+        if (p.shadow === true) break;
         state.status = "executed";
         state.output = String(p.output ?? "");
         state.fail_reason = null;
         break;
       case "TaskFailed":
+        if (p.shadow === true) break;
         state.status = "failed";
         state.fail_reason = String(p.reason ?? "failed");
         break;

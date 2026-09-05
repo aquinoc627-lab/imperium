@@ -1,7 +1,10 @@
 //! Policy Engine
 //!
-//! OPA/Rego embedded for policy evaluation.
-//! All decisions are auditable and replayable.
+//! Phase 9 "Semantic Firewall": the small purpose-built `.imp` language in
+//! [`imp`]. The Rego types below are the aspirational model for specs 02–04
+//! and are not used by the v0 kernel.
+
+pub mod imp;
 
 use crate::crypto::Hash;
 use crate::event::ActorId;
@@ -177,4 +180,5 @@ pub mod builtin {
 }
 
 /// Default policy set ID
-pub const DEFAULT_POLICY_SET: PolicySetId = PolicySetId(uuid::uuid!("00000000-0000-0000-0000-000000000000"));
+pub const DEFAULT_POLICY_SET: PolicySetId =
+    PolicySetId(uuid::uuid!("00000000-0000-0000-0000-000000000000"));

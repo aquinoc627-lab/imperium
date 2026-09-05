@@ -1,93 +1,206 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { guestWasmBytes } from "./guest-bytes.ts";
-import { pathAllowed } from "./token.ts";
+import { runGuest, rightsFromToken, type GuestFs } from "./wasm-host.ts";
 
-async function run(
-  op: { kind: "echo"; text: string } | { kind: "write"; path: string; contents: string },
-  rights: { echo: boolean; write: boolean; fsPrefixes: string[] },
-) {
-  let echoOut = "";
-  let written: { path: string; contents: string } | null = null;
-  let memory: WebAssembly.Memory;
-  const { instance } = (await WebAssembly.instantiate(guestWasmBytes(), {
-    host: {
-      echo: (ptr: number, len: number) => {
-        if (!rights.echo) throw new Error("host.echo denied");
-        echoOut = new TextDecoder().decode(
-          new Uint8Array(memory.buffer).subarray(ptr, ptr + len),
-        );
-      },
-      write: (pp: number, pl: number, bp: number, bl: number) => {
-        if (!rights.write) throw new Error("host.write denied");
-        const mem = new Uint8Array(memory.buffer);
-        const path = new TextDecoder().decode(mem.subarray(pp, pp + pl));
-        const contents = new TextDecoder().decode(mem.subarray(bp, bp + bl));
-        if (!pathAllowed(path, rights.fsPrefixes)) throw new Error("host.write path denied");
-        written = { path, contents };
-        return contents.length;
-      },
+function memFs(): GuestFs & { written: Map<string, string> } {
+  const files = new Map<string, string>();
+  const dirs = new Set<string>();
+  const dirOf = (path: string) => {
+    const i = path.lastIndexOf("/");
+    if (i > 0) dirs.add(path.slice(0, i));
+  };
+  return {
+    written: files,
+    write(path, contents) {
+      files.set(path, contents);
+      dirOf(path);
+      return contents.length;
     },
-  })) as WebAssembly.WebAssemblyInstantiatedSource;
-  memory = instance.exports.memory as WebAssembly.Memory;
-  const enc = new TextEncoder();
-  if (op.kind === "echo") {
-    if (!rights.echo) throw new Error("host.echo denied");
-    const bytes = enc.encode(op.text);
-    new Uint8Array(memory.buffer).set(bytes, 64);
-    (instance.exports.run_echo as (a: number, b: number) => void)(64, bytes.length);
-    return { echoOut, written };
-  }
-  if (!rights.write) throw new Error("host.write denied");
-  const p = enc.encode(op.path);
-  const c = enc.encode(op.contents);
-  const mem = new Uint8Array(memory.buffer);
-  mem.set(p, 64);
-  mem.set(c, 64 + p.length + 8);
-  (instance.exports.run_write as (a: number, b: number, c: number, d: number) => number)(
-    64,
-    p.length,
-    64 + p.length + 8,
-    c.length,
-  );
-  return { echoOut, written };
+    read(path) {
+      return files.get(path) ?? null;
+    },
+    append(path, contents) {
+      files.set(path, (files.get(path) ?? "") + contents);
+      dirOf(path);
+      return contents.length;
+    },
+    list(path) {
+      const out: string[] = [];
+      for (const [p] of files) {
+        if (p.startsWith(`${path}/`)) out.push(p.slice(path.length + 1));
+      }
+      for (const d of dirs) {
+        if (d.startsWith(`${path}/`)) out.push(`${d.slice(path.length + 1)}/`);
+      }
+      return out;
+    },
+  };
 }
 
+const SCRATCH = ["scratch"];
+
 test("echo goes through the wasm guest", async () => {
-  const r = await run({ kind: "echo", text: "ping" }, {
-    echo: true,
-    write: false,
-    fsPrefixes: [],
-  });
-  assert.equal(r.echoOut, "ping");
+  const out = await runGuest(
+    { kind: "echo", text: "ping" },
+    rightsFromToken("cap.echo", []),
+    memFs(),
+  );
+  assert.equal(out, "ping");
 });
 
 test("write goes through the wasm guest", async () => {
-  const r = await run(
+  const fs = memFs();
+  const out = await runGuest(
     { kind: "write", path: "scratch/a.txt", contents: "hi" },
-    { echo: false, write: true, fsPrefixes: ["scratch"] },
+    rightsFromToken("cap.write", SCRATCH),
+    fs,
   );
-  assert.deepEqual(r.written, { path: "scratch/a.txt", contents: "hi" });
+  assert.equal(out, "wrote scratch/a.txt (2 bytes)");
+  assert.equal(fs.written.get("scratch/a.txt"), "hi");
 });
 
 test("write without rights is denied", async () => {
   await assert.rejects(
     () =>
-      run(
+      runGuest(
         { kind: "write", path: "scratch/a.txt", contents: "hi" },
-        { echo: true, write: false, fsPrefixes: [] },
+        rightsFromToken("cap.echo", []),
+        memFs(),
       ),
-    /denied/,
+    /host\.write denied/,
   );
 });
 
 test("write path outside grant is denied", async () => {
   await assert.rejects(
     () =>
-      run(
+      runGuest(
         { kind: "write", path: "etc/passwd", contents: "x" },
-        { echo: false, write: true, fsPrefixes: ["scratch"] },
+        rightsFromToken("cap.write", SCRATCH),
+        memFs(),
       ),
-    /path denied/,
+    /host\.write path denied/,
+  );
+});
+
+test("read returns file contents", async () => {
+  const fs = memFs();
+  fs.write("scratch/notes.txt", "hello");
+  const out = await runGuest(
+    { kind: "read", path: "scratch/notes.txt" },
+    rightsFromToken("cap.read", SCRATCH),
+    fs,
+  );
+  assert.equal(out, "hello");
+});
+
+test("read without rights is denied", async () => {
+  await assert.rejects(
+    () =>
+      runGuest(
+        { kind: "read", path: "scratch/notes.txt" },
+        rightsFromToken("cap.write", SCRATCH),
+        memFs(),
+      ),
+    /host\.read denied/,
+  );
+});
+
+test("read of a sensitive path is denied", async () => {
+  const fs = memFs();
+  fs.write("scratch/.env", "TOP_SECRET=1");
+  await assert.rejects(
+    () =>
+      runGuest(
+        { kind: "read", path: "scratch/.env" },
+        rightsFromToken("cap.read", SCRATCH),
+        fs,
+      ),
+    /host\.read sensitive path denied/,
+  );
+  await assert.rejects(
+    () =>
+      runGuest(
+        { kind: "read", path: "scratch/server.key" },
+        rightsFromToken("cap.read", SCRATCH),
+        fs,
+      ),
+    /host\.read sensitive path denied/,
+  );
+});
+
+test("read of a missing file fails", async () => {
+  await assert.rejects(
+    () =>
+      runGuest(
+        { kind: "read", path: "scratch/absent.txt" },
+        rightsFromToken("cap.read", SCRATCH),
+        memFs(),
+      ),
+    /host\.read not found/,
+  );
+});
+
+test("append grows the file without truncating", async () => {
+  const fs = memFs();
+  await runGuest(
+    { kind: "append", path: "scratch/log.txt", contents: "one" },
+    rightsFromToken("cap.append", SCRATCH),
+    fs,
+  );
+  const out = await runGuest(
+    { kind: "append", path: "scratch/log.txt", contents: "two" },
+    rightsFromToken("cap.append", SCRATCH),
+    fs,
+  );
+  assert.equal(out, "appended 3 bytes to scratch/log.txt");
+  assert.equal(fs.written.get("scratch/log.txt"), "onetwo");
+});
+
+test("append without rights is denied", async () => {
+  await assert.rejects(
+    () =>
+      runGuest(
+        { kind: "append", path: "scratch/log.txt", contents: "x" },
+        rightsFromToken("cap.write", SCRATCH),
+        memFs(),
+      ),
+    /host\.append denied/,
+  );
+});
+
+test("list returns entries under the prefix", async () => {
+  const fs = memFs();
+  fs.write("scratch/notes_dir/alpha.txt", "a");
+  fs.write("scratch/notes_dir/beta.txt", "b");
+  const out = await runGuest(
+    { kind: "list", path: "scratch/notes_dir" },
+    rightsFromToken("cap.list", SCRATCH),
+    fs,
+  );
+  assert.deepEqual(out.split("\n").sort(), ["alpha.txt", "beta.txt"]);
+});
+
+test("list without rights is denied", async () => {
+  await assert.rejects(
+    () =>
+      runGuest(
+        { kind: "list", path: "scratch/notes_dir" },
+        rightsFromToken("cap.read", SCRATCH),
+        memFs(),
+      ),
+    /host\.list denied/,
+  );
+});
+
+test("append to a sensitive path is denied", async () => {
+  await assert.rejects(
+    () =>
+      runGuest(
+        { kind: "append", path: "scratch/creds.secret", contents: "x" },
+        rightsFromToken("cap.append", SCRATCH),
+        memFs(),
+      ),
+    /host\.append sensitive path denied/,
   );
 });

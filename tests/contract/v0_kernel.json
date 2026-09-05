@@ -1,0 +1,1759 @@
+{
+  "comment": "Shared v0 kernel contract fixtures. web/v0 (TS reference) and imperium-core (Rust canonical) must both validate every case. IR ids/timestamps are normalized to <uuid>/<task-uuid>/<ts> before comparison.",
+  "compile_cases": [
+    {
+      "name": "echo",
+      "input": "Echo this message: ping",
+      "expected_ir": {
+        "id": "<uuid>",
+        "name": "Echo ping",
+        "nl_source": "Echo this message: ping",
+        "goal": {
+          "description": "Echo the text ping",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [
+          {
+            "id": "sc1",
+            "metric": "TestPassRate",
+            "threshold": {
+              "operator": "GreaterThanOrEqual",
+              "value": 1,
+              "unit": "ratio"
+            },
+            "weight": 1
+          }
+        ],
+        "tasks": [
+          {
+            "id": "<task-uuid>",
+            "name": "Echo",
+            "description": "ping",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.echo"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 10,
+            "target_path": null,
+            "effects": [
+              {
+                "type": "echo",
+                "text": "ping"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.0,
+        "requires_approval": false,
+        "version": 2,
+        "compiled_at": "<ts>",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      }
+    },
+    {
+      "name": "write",
+      "input": "Write file notes.txt with contents hello",
+      "expected_ir": {
+        "id": "<uuid>",
+        "name": "Write scratch/notes.txt",
+        "nl_source": "Write file notes.txt with contents hello",
+        "goal": {
+          "description": "Write scratch/notes.txt",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [
+          {
+            "id": "sc1",
+            "metric": "TestPassRate",
+            "threshold": {
+              "operator": "GreaterThanOrEqual",
+              "value": 1,
+              "unit": "ratio"
+            },
+            "weight": 1
+          }
+        ],
+        "tasks": [
+          {
+            "id": "<task-uuid>",
+            "name": "Write",
+            "description": "hello",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.write"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 20,
+            "target_path": "scratch/notes.txt",
+            "effects": [
+              {
+                "type": "write",
+                "path": "scratch/notes.txt",
+                "size_bytes": 5
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.5,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "<ts>",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      }
+    },
+    {
+      "name": "read",
+      "input": "Read file notes.txt",
+      "expected_ir": {
+        "id": "<uuid>",
+        "name": "Read scratch/notes.txt",
+        "nl_source": "Read file notes.txt",
+        "goal": {
+          "description": "Read scratch/notes.txt",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [
+          {
+            "id": "sc1",
+            "metric": "TestPassRate",
+            "threshold": {
+              "operator": "GreaterThanOrEqual",
+              "value": 1,
+              "unit": "ratio"
+            },
+            "weight": 1
+          }
+        ],
+        "tasks": [
+          {
+            "id": "<task-uuid>",
+            "name": "Read",
+            "description": "scratch/notes.txt",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.read"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 15,
+            "target_path": "scratch/notes.txt",
+            "effects": [
+              {
+                "type": "read",
+                "path": "scratch/notes.txt"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.2,
+        "requires_approval": false,
+        "version": 2,
+        "compiled_at": "<ts>",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      }
+    },
+    {
+      "name": "append",
+      "input": "Append file log.txt with contents hi",
+      "expected_ir": {
+        "id": "<uuid>",
+        "name": "Append scratch/log.txt",
+        "nl_source": "Append file log.txt with contents hi",
+        "goal": {
+          "description": "Append scratch/log.txt",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [
+          {
+            "id": "sc1",
+            "metric": "TestPassRate",
+            "threshold": {
+              "operator": "GreaterThanOrEqual",
+              "value": 1,
+              "unit": "ratio"
+            },
+            "weight": 1
+          }
+        ],
+        "tasks": [
+          {
+            "id": "<task-uuid>",
+            "name": "Append",
+            "description": "hi",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.append"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 20,
+            "target_path": "scratch/log.txt",
+            "effects": [
+              {
+                "type": "append",
+                "path": "scratch/log.txt",
+                "size_bytes": 2
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.4,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "<ts>",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      }
+    },
+    {
+      "name": "list",
+      "input": "List files under notes_dir",
+      "expected_ir": {
+        "id": "<uuid>",
+        "name": "List scratch/notes_dir",
+        "nl_source": "List files under notes_dir",
+        "goal": {
+          "description": "List scratch/notes_dir",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [
+          {
+            "id": "sc1",
+            "metric": "TestPassRate",
+            "threshold": {
+              "operator": "GreaterThanOrEqual",
+              "value": 1,
+              "unit": "ratio"
+            },
+            "weight": 1
+          }
+        ],
+        "tasks": [
+          {
+            "id": "<task-uuid>",
+            "name": "List",
+            "description": "scratch/notes_dir",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.list"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 15,
+            "target_path": "scratch/notes_dir",
+            "effects": [
+              {
+                "type": "list",
+                "path": "scratch/notes_dir"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.1,
+        "requires_approval": false,
+        "version": 2,
+        "compiled_at": "<ts>",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      }
+    },
+    {
+      "name": "fetch",
+      "input": "Fetch https://api.example.com/v1/x",
+      "expected_ir": {
+        "id": "<uuid>",
+        "name": "Fetch https://api.example.com/v1/x",
+        "nl_source": "Fetch https://api.example.com/v1/x",
+        "goal": {
+          "description": "Fetch https://api.example.com/v1/x",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [
+          {
+            "id": "sc1",
+            "metric": "TestPassRate",
+            "threshold": {
+              "operator": "GreaterThanOrEqual",
+              "value": 1,
+              "unit": "ratio"
+            },
+            "weight": 1
+          }
+        ],
+        "tasks": [
+          {
+            "id": "<task-uuid>",
+            "name": "Fetch",
+            "description": "https://api.example.com/v1/x",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.http"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 500,
+            "target_path": "https://api.example.com/v1/x",
+            "effects": [
+              {
+                "type": "fetch",
+                "url": "https://api.example.com/v1/x"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.6,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "<ts>",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      }
+    }
+  ],
+  "compile_errors": [
+    {
+      "name": "path_escape",
+      "input": "Write file ../secret with contents x",
+      "error": "Path escape (..) is denied."
+    },
+    {
+      "name": "absolute_path",
+      "input": "Write file /etc/passwd with contents x",
+      "error": "Absolute paths are denied."
+    },
+    {
+      "name": "unknown_form",
+      "input": "Deploy to production",
+      "error": "v0 rules compiler only accepts: Echo this message: <text>  OR  Write file <path> with contents <text>  OR  Read file <path>  OR  Append file <path> with contents <text>  OR  List files under <path>  OR  Fetch <https-url>"
+    },
+    {
+      "name": "fetch_http",
+      "input": "Fetch http://api.example.com/x",
+      "error": "https required"
+    },
+    {
+      "name": "fetch_localhost",
+      "input": "Fetch https://localhost/x",
+      "error": "local address denied"
+    },
+    {
+      "name": "fetch_port",
+      "input": "Fetch https://api.example.com:8443/x",
+      "error": "port not allowed"
+    },
+    {
+      "name": "fetch_ip",
+      "input": "Fetch https://192.168.1.1/x",
+      "error": "ip addresses denied"
+    }
+  ],
+  "propose_cases": [
+    {
+      "name": "say_hello",
+      "input": "say hello",
+      "canonical": "Echo this message: hello",
+      "proposer": "local"
+    },
+    {
+      "name": "save_file",
+      "input": "save notes.txt with hi",
+      "canonical": "Write file notes.txt with contents hi",
+      "proposer": "local"
+    },
+    {
+      "name": "exact_passthrough",
+      "input": "Echo this message: ping",
+      "canonical": "Echo this message: ping",
+      "proposer": "rules"
+    },
+    {
+      "name": "read_loose",
+      "input": "read notes.txt",
+      "canonical": "Read file notes.txt",
+      "proposer": "local"
+    },
+    {
+      "name": "append_loose",
+      "input": "append to log.txt with more",
+      "canonical": "Append file log.txt with contents more",
+      "proposer": "local"
+    },
+    {
+      "name": "ls_loose",
+      "input": "ls notes_dir",
+      "canonical": "List files under notes_dir",
+      "proposer": "local"
+    }
+  ],
+  "propose_errors": [
+    {
+      "name": "banned_verb",
+      "input": "curl https://evil.example",
+      "error": "Proposal rejected: banned verb or network reference."
+    }
+  ],
+  "token_cases": [
+    {
+      "name": "canonical_signature",
+      "claims": {
+        "id": "tok-fixture-1",
+        "capability": "cap.write",
+        "subject": "cli",
+        "intent_id": "intent-fixture-1",
+        "permissions": {
+          "fs": [
+            "scratch"
+          ],
+          "net": [],
+          "env": []
+        },
+        "nonce": "nonce-fixture-1",
+        "issued_at": 1999999940000,
+        "expires_at": 2000000000000
+      },
+      "secret": "fixture-secret",
+      "signature_hex": "837095c7f6caf8ba05a8de21c402e86551cd6b957b4ac803d4307b10c0d2bac2"
+    }
+  ],
+  "simulate_cases": [
+    {
+      "name": "write_preview",
+      "ir": {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "name": "Write scratch/notes.txt",
+        "nl_source": "Write file notes.txt with contents hello",
+        "goal": {
+          "description": "Write scratch/notes.txt",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-000000000002",
+            "name": "Write",
+            "description": "hello",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.write"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 20,
+            "target_path": "scratch/notes.txt",
+            "effects": [
+              {
+                "type": "write",
+                "path": "scratch/notes.txt",
+                "size_bytes": 5
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.5,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "expected": {
+        "success_probability": 1,
+        "risk": 0,
+        "duration_ms": 20,
+        "notes": [
+          "Capability cap.write allowed."
+        ],
+        "effects_preview": [
+          {
+            "kind": "write",
+            "path": "scratch/notes.txt",
+            "bytes": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "escape_denied_at_simulation",
+      "ir": {
+        "id": "00000000-0000-0000-0000-000000000003",
+        "name": "Write ../secret",
+        "nl_source": "Write file ../secret with contents x",
+        "goal": {
+          "description": "Write ../secret",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-000000000004",
+            "name": "Write",
+            "description": "x",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.write"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 20,
+            "target_path": null,
+            "effects": [
+              {
+                "type": "write",
+                "path": "../secret",
+                "size_bytes": 1
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.5,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "expected": {
+        "success_probability": 0,
+        "risk": 1,
+        "duration_ms": 20,
+        "notes": [
+          "Capability cap.write allowed.",
+          "Dry-run denied one or more effects; approval is not possible."
+        ],
+        "effects_preview": [
+          {
+            "path": "../secret",
+            "reason": "Path escape (..) is denied.",
+            "kind": "denied",
+            "capability": "cap.write"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown_capability",
+      "ir": {
+        "id": "00000000-0000-0000-0000-000000000005",
+        "name": "Echo ping",
+        "nl_source": "Echo this message: ping",
+        "goal": {
+          "description": "Echo the text ping",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-000000000006",
+            "name": "Echo",
+            "description": "ping",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.unknown"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 10,
+            "target_path": null
+          }
+        ],
+        "risk_score": 0,
+        "requires_approval": true,
+        "version": 1,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "expected": {
+        "success_probability": 0,
+        "risk": 1,
+        "duration_ms": 10,
+        "notes": [
+          "Unknown or missing capability. Execution would be denied.",
+          "Task Echo declares no effects; preview unavailable."
+        ],
+        "effects_preview": []
+      }
+    },
+    {
+      "name": "sensitive_read_denied",
+      "ir": {
+        "id": "00000000-0000-0000-0000-000000000007",
+        "name": "Read scratch/.env",
+        "nl_source": "Read file .env",
+        "goal": {
+          "description": "Read scratch/.env",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-000000000008",
+            "name": "Read",
+            "description": "scratch/.env",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.read"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 15,
+            "target_path": "scratch/.env",
+            "effects": [
+              {
+                "type": "read",
+                "path": "scratch/.env"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.2,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "expected": {
+        "success_probability": 0,
+        "risk": 1,
+        "duration_ms": 15,
+        "notes": [
+          "Capability cap.read allowed.",
+          "Dry-run denied one or more effects; approval is not possible."
+        ],
+        "effects_preview": [
+          {
+            "kind": "denied",
+            "capability": "cap.read",
+            "path": "scratch/.env",
+            "reason": "sensitive path denied"
+          }
+        ]
+      }
+    },
+    {
+      "name": "list_preview",
+      "ir": {
+        "id": "00000000-0000-0000-0000-000000000009",
+        "name": "List scratch/notes_dir",
+        "nl_source": "List files under notes_dir",
+        "goal": {
+          "description": "List scratch/notes_dir",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-00000000000a",
+            "name": "List",
+            "description": "scratch/notes_dir",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.list"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 15,
+            "target_path": "scratch/notes_dir",
+            "effects": [
+              {
+                "type": "list",
+                "path": "scratch/notes_dir"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.1,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "expected": {
+        "success_probability": 1,
+        "risk": 0,
+        "duration_ms": 15,
+        "notes": [
+          "Capability cap.list allowed."
+        ],
+        "effects_preview": [
+          {
+            "kind": "list",
+            "path": "scratch/notes_dir"
+          }
+        ]
+      }
+    },
+    {
+      "name": "policy_denies_read",
+      "ir": {
+        "id": "00000000-0000-0000-0000-00000000000b",
+        "name": "Read scratch/notes.txt",
+        "nl_source": "Read file notes.txt",
+        "goal": {
+          "description": "Read scratch/notes.txt",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-00000000000c",
+            "name": "Read",
+            "description": "scratch/notes.txt",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.read"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 15,
+            "target_path": "scratch/notes.txt",
+            "effects": [
+              {
+                "type": "read",
+                "path": "scratch/notes.txt"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.2,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "expected": {
+        "success_probability": 0,
+        "risk": 1,
+        "duration_ms": 15,
+        "notes": [
+          "Capability cap.read allowed.",
+          "Dry-run denied one or more effects; approval is not possible."
+        ],
+        "effects_preview": [
+          {
+            "kind": "denied",
+            "capability": "cap.read",
+            "path": "scratch/notes.txt",
+            "reason": "policy: deny read matching scratch/notes*"
+          }
+        ]
+      },
+      "policy": "deny read matching scratch/notes*"
+    },
+    {
+      "name": "fetch_allowed_preview",
+      "ir": {
+        "id": "00000000-0000-0000-0000-0000000000e1",
+        "name": "Fetch https://api.example.com/v1/x",
+        "nl_source": "Fetch https://api.example.com/v1/x",
+        "goal": {
+          "description": "Fetch https://api.example.com/v1/x",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000e2",
+            "name": "Fetch",
+            "description": "https://api.example.com/v1/x",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.http"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 500,
+            "target_path": "https://api.example.com/v1/x",
+            "effects": [
+              {
+                "type": "fetch",
+                "url": "https://api.example.com/v1/x"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.6,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "policy": "allow fetch to api.example.com",
+      "expected": {
+        "success_probability": 1,
+        "risk": 0,
+        "duration_ms": 500,
+        "notes": [
+          "Capability cap.http allowed."
+        ],
+        "effects_preview": [
+          {
+            "kind": "fetch",
+            "url": "https://api.example.com/v1/x"
+          }
+        ]
+      }
+    },
+    {
+      "name": "fetch_denied_no_policy",
+      "ir": {
+        "id": "00000000-0000-0000-0000-0000000000e1",
+        "name": "Fetch https://api.example.com/v1/x",
+        "nl_source": "Fetch https://api.example.com/v1/x",
+        "goal": {
+          "description": "Fetch https://api.example.com/v1/x",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000e2",
+            "name": "Fetch",
+            "description": "https://api.example.com/v1/x",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.http"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 500,
+            "target_path": "https://api.example.com/v1/x",
+            "effects": [
+              {
+                "type": "fetch",
+                "url": "https://api.example.com/v1/x"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.6,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "expected": {
+        "success_probability": 0,
+        "risk": 1,
+        "duration_ms": 500,
+        "notes": [
+          "Capability cap.http allowed.",
+          "Dry-run denied one or more effects; approval is not possible."
+        ],
+        "effects_preview": [
+          {
+            "kind": "denied",
+            "capability": "cap.http",
+            "path": "https://api.example.com/v1/x",
+            "reason": "no allow fetch rule matched"
+          }
+        ]
+      }
+    },
+    {
+      "name": "fetch_denied_bad_url",
+      "ir": {
+        "id": "00000000-0000-0000-0000-0000000000e1",
+        "name": "Fetch https://localhost/x",
+        "nl_source": "Fetch https://localhost/x",
+        "goal": {
+          "description": "Fetch https://localhost/x",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000e2",
+            "name": "Fetch",
+            "description": "https://localhost/x",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.http"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 500,
+            "target_path": "https://localhost/x",
+            "effects": [
+              {
+                "type": "fetch",
+                "url": "https://localhost/x"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.6,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "policy": "allow fetch to localhost",
+      "expected": {
+        "success_probability": 0,
+        "risk": 1,
+        "duration_ms": 500,
+        "notes": [
+          "Capability cap.http allowed.",
+          "Dry-run denied one or more effects; approval is not possible."
+        ],
+        "effects_preview": [
+          {
+            "kind": "denied",
+            "capability": "cap.http",
+            "path": "https://localhost/x",
+            "reason": "local address denied"
+          }
+        ]
+      }
+    }
+  ],
+  "fold_cases": [
+    {
+      "name": "happy_path",
+      "events": [
+        {
+          "kind": "IntentProposed",
+          "payload": {
+            "proposer": "rules",
+            "canonical": "Echo this message: ping"
+          }
+        },
+        {
+          "kind": "IntentCompiled",
+          "payload": {
+            "compiler_version": "imperium-intent-rules-0.2.0"
+          }
+        },
+        {
+          "kind": "IntentSimulated",
+          "payload": {
+            "success_probability": 1,
+            "risk": 0,
+            "duration_ms": 10,
+            "notes": [],
+            "effects_preview": [
+              {
+                "kind": "echo",
+                "text": "ping"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "IntentApproved",
+          "payload": {}
+        },
+        {
+          "kind": "TokenIssued",
+          "payload": {
+            "token_id": "tok-1",
+            "fingerprint": "fp-1"
+          }
+        },
+        {
+          "kind": "TaskSucceeded",
+          "payload": {
+            "output": "ping"
+          }
+        }
+      ],
+      "expected": {
+        "status": "executed",
+        "output": "ping",
+        "fail_reason": null,
+        "proposer": "rules",
+        "canonical": "Echo this message: ping",
+        "token": {
+          "token_id": "tok-1",
+          "fingerprint": "fp-1",
+          "revoked": false
+        }
+      }
+    },
+    {
+      "name": "revoked_then_failed",
+      "events": [
+        {
+          "kind": "IntentCompiled",
+          "payload": {}
+        },
+        {
+          "kind": "IntentSimulated",
+          "payload": {
+            "success_probability": 1,
+            "risk": 0,
+            "duration_ms": 10,
+            "notes": []
+          }
+        },
+        {
+          "kind": "IntentApproved",
+          "payload": {}
+        },
+        {
+          "kind": "TokenIssued",
+          "payload": {
+            "token_id": "tok-2",
+            "fingerprint": "fp-2"
+          }
+        },
+        {
+          "kind": "TokenRevoked",
+          "payload": {
+            "token_id": "tok-2"
+          }
+        },
+        {
+          "kind": "TaskFailed",
+          "payload": {
+            "reason": "nonce reused"
+          }
+        }
+      ],
+      "expected": {
+        "status": "failed",
+        "output": null,
+        "fail_reason": "nonce reused",
+        "token": {
+          "token_id": "tok-2",
+          "fingerprint": "fp-2",
+          "revoked": true
+        }
+      }
+    },
+    {
+      "name": "shadow_keeps_status",
+      "events": [
+        {
+          "kind": "IntentCompiled",
+          "payload": {}
+        },
+        {
+          "kind": "IntentSimulated",
+          "payload": {
+            "success_probability": 1,
+            "risk": 0,
+            "duration_ms": 20,
+            "notes": []
+          }
+        },
+        {
+          "kind": "IntentApproved",
+          "payload": {}
+        },
+        {
+          "kind": "TaskStarted",
+          "payload": {
+            "task_id": "t",
+            "shadow": true
+          }
+        },
+        {
+          "kind": "TaskSucceeded",
+          "payload": {
+            "shadow": true,
+            "output": "shadow"
+          }
+        },
+        {
+          "kind": "ShadowVerified",
+          "payload": {
+            "match": true
+          }
+        }
+      ],
+      "expected": {
+        "status": "approved",
+        "output": null
+      }
+    }
+  ],
+  "policy_cases": [
+    {
+      "name": "deny_key",
+      "policy": "deny read matching *.key\nallow read under scratch/",
+      "verb": "read",
+      "path": "scratch/server.key",
+      "text": "scratch/server.key",
+      "expected": {
+        "kind": "deny",
+        "rule": 0,
+        "reason": "deny read matching *.key"
+      }
+    },
+    {
+      "name": "explicit_allow",
+      "policy": "deny read matching *.key\nallow read under scratch/",
+      "verb": "read",
+      "path": "scratch/other.txt",
+      "text": "scratch/other.txt",
+      "expected": {
+        "kind": "allow",
+        "rule": 1
+      }
+    },
+    {
+      "name": "fallthrough",
+      "policy": "deny read matching *.key",
+      "verb": "write",
+      "path": "scratch/x.txt",
+      "text": "scratch/x.txt",
+      "expected": {
+        "kind": "allow",
+        "rule": null
+      }
+    },
+    {
+      "name": "require_approval",
+      "policy": "require approval append",
+      "verb": "append",
+      "path": "scratch/log.txt",
+      "text": "scratch/log.txt tail",
+      "expected": {
+        "kind": "require_approval",
+        "rule": 0
+      }
+    },
+    {
+      "name": "content_deny",
+      "policy": "deny containing curl",
+      "verb": "write",
+      "path": "scratch/notes.txt",
+      "text": "scratch/notes.txt run curl now",
+      "expected": {
+        "kind": "deny",
+        "rule": 0,
+        "reason": "deny containing curl"
+      }
+    },
+    {
+      "name": "content_deny_case_insensitive",
+      "policy": "deny containing CURL",
+      "verb": "write",
+      "path": "scratch/notes.txt",
+      "text": "scratch/notes.txt CURL it",
+      "expected": {
+        "kind": "deny",
+        "rule": 0,
+        "reason": "deny containing CURL"
+      }
+    },
+    {
+      "name": "fetch_allow_exact",
+      "policy": "allow fetch to api.example.com",
+      "verb": "fetch",
+      "path": "api.example.com",
+      "text": "https://api.example.com/v1/x",
+      "expected": {
+        "kind": "allow",
+        "rule": 0
+      }
+    },
+    {
+      "name": "fetch_allow_wildcard",
+      "policy": "allow fetch to *.example.com",
+      "verb": "fetch",
+      "path": "api.example.com",
+      "text": "https://api.example.com/v1/x",
+      "expected": {
+        "kind": "allow",
+        "rule": 0
+      }
+    },
+    {
+      "name": "fetch_deny_glob",
+      "policy": "deny fetch matching *.example.com\nallow fetch to *.example.com",
+      "verb": "fetch",
+      "path": "api.example.com",
+      "text": "https://api.example.com/v1/x",
+      "expected": {
+        "kind": "deny",
+        "rule": 0,
+        "reason": "deny fetch matching *.example.com"
+      }
+    },
+    {
+      "name": "fetch_allow_is_path_gated_for_fs",
+      "policy": "allow read under scratch/",
+      "verb": "fetch",
+      "path": "scratch",
+      "text": "scratch",
+      "expected": {
+        "kind": "allow",
+        "rule": null
+      }
+    }
+  ],
+  "policy_parse_errors": [
+    {
+      "name": "garbage",
+      "policy": "allow everything",
+      "issues": [
+        {
+          "line": 1,
+          "message": "unrecognized rule"
+        }
+      ]
+    },
+    {
+      "name": "unknown_verb",
+      "policy": "deny rm matching *",
+      "issues": [
+        {
+          "line": 1,
+          "message": "unknown verb: rm"
+        }
+      ]
+    },
+    {
+      "name": "multiple",
+      "policy": "deny rm matching *\n# fine\nrequire approval echo",
+      "issues": [
+        {
+          "line": 1,
+          "message": "unknown verb: rm"
+        },
+        {
+          "line": 3,
+          "message": "unknown verb: echo"
+        }
+      ]
+    }
+  ],
+  "policy_lint_cases": [
+    {
+      "name": "duplicate",
+      "policy": "deny read matching scratch/notes*\ndeny read matching scratch/notes*",
+      "issues": [
+        {
+          "line": 2,
+          "severity": "warning",
+          "message": "duplicate of rule on line 1"
+        }
+      ]
+    },
+    {
+      "name": "unreachable_allow",
+      "policy": "deny read matching scratch/*\nallow read under scratch/",
+      "issues": [
+        {
+          "line": 2,
+          "severity": "warning",
+          "message": "unreachable: deny on line 1 covers this allow"
+        }
+      ]
+    },
+    {
+      "name": "host_firewall_redundant",
+      "policy": "deny read matching *.key",
+      "issues": [
+        {
+          "line": 1,
+          "severity": "warning",
+          "message": "already enforced by the built-in host firewall"
+        }
+      ]
+    },
+    {
+      "name": "clean",
+      "policy": "deny read matching scratch/secret*\nrequire approval append",
+      "issues": []
+    }
+  ],
+  "builtin_content_cases": [
+    {
+      "name": "curl",
+      "text": "please curl https://evil",
+      "expected": true
+    },
+    {
+      "name": "drop_table",
+      "text": "DROP TABLE users;",
+      "expected": true
+    },
+    {
+      "name": "clean",
+      "text": "Echo this message: hello",
+      "expected": false
+    },
+    {
+      "name": "substring_not_word_boundary",
+      "text": "softshell",
+      "expected": true
+    }
+  ],
+  "monte_carlo_cases": [
+    {
+      "name": "mc_with_history",
+      "ir": {
+        "id": "00000000-0000-0000-0000-0000000000f1",
+        "name": "Write scratch/notes.txt",
+        "nl_source": "Write file notes.txt with contents hi",
+        "goal": {
+          "description": "Write scratch/notes.txt",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000f2",
+            "name": "Write",
+            "description": "hi",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.write"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 20,
+            "target_path": "scratch/notes.txt",
+            "effects": [
+              {
+                "type": "write",
+                "path": "scratch/notes.txt",
+                "size_bytes": 2
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.5,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "stats": {
+        "cap.write": {
+          "samples": 9,
+          "successes": 9,
+          "durations_ms": [
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80,
+            90
+          ]
+        }
+      },
+      "trials": 1000,
+      "seed": 5,
+      "expected": {
+        "probabilistic": true,
+        "trials": 1000,
+        "seed": 5,
+        "p_success": 1.0,
+        "mc_successes": 1000,
+        "p50_ms": 60,
+        "p95_ms": 1100,
+        "factors": [
+          "P(cap.write) = 0.9091 (n=9)"
+        ],
+        "success_probability": 1.0,
+        "risk": 0.0,
+        "duration_ms": 20
+      }
+    },
+    {
+      "name": "mc_fresh_prior",
+      "ir": {
+        "id": "00000000-0000-0000-0000-0000000000f1",
+        "name": "Write scratch/notes.txt",
+        "nl_source": "Write file notes.txt with contents hi",
+        "goal": {
+          "description": "Write scratch/notes.txt",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000f2",
+            "name": "Write",
+            "description": "hi",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.write"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 20,
+            "target_path": "scratch/notes.txt",
+            "effects": [
+              {
+                "type": "write",
+                "path": "scratch/notes.txt",
+                "size_bytes": 2
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.5,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "stats": {},
+      "trials": 1000,
+      "seed": 7,
+      "expected": {
+        "probabilistic": true,
+        "trials": 1000,
+        "seed": 7,
+        "p_success": 0.8809999823570251,
+        "mc_successes": 881,
+        "p50_ms": 20,
+        "p95_ms": 3060,
+        "factors": [
+          "P(cap.write) = 0.5000 (prior, n=0)"
+        ],
+        "success_probability": 1.0,
+        "risk": 0.0,
+        "duration_ms": 20
+      }
+    },
+    {
+      "name": "mc_denial_passthrough",
+      "ir": {
+        "id": "00000000-0000-0000-0000-0000000000f3",
+        "name": "Write ../secret",
+        "nl_source": "Write file ../secret with contents x",
+        "goal": {
+          "description": "Write ../secret",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000f4",
+            "name": "Write",
+            "description": "x",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.write"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 20,
+            "target_path": null,
+            "effects": [
+              {
+                "type": "write",
+                "path": "../secret",
+                "size_bytes": 1
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.5,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "stats": {
+        "cap.write": {
+          "samples": 9,
+          "successes": 9,
+          "durations_ms": [
+            10,
+            20,
+            30,
+            40,
+            50
+          ]
+        }
+      },
+      "trials": 100,
+      "seed": 3,
+      "expected": {
+        "probabilistic": false,
+        "trials": 0,
+        "mc_successes": 0,
+        "p_success": 0.0,
+        "p50_ms": 0,
+        "p95_ms": 0,
+        "factors": [],
+        "success_probability": 0.0,
+        "risk": 1.0,
+        "duration_ms": 20
+      }
+    }
+  ],
+  "form_template_cases": [
+    {
+      "name": "echo",
+      "ir": {
+        "id": "00000000-0000-0000-0000-0000000000aa",
+        "name": "t",
+        "nl_source": "Echo this message: ping",
+        "goal": {
+          "description": "t",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000ab",
+            "name": "Echo",
+            "description": "ping",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.echo"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 10,
+            "target_path": null,
+            "effects": [
+              {
+                "type": "echo",
+                "text": "ping"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.0,
+        "requires_approval": false,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "expected": {
+        "template": "Echo this message: {{slot}}",
+        "slot": "description"
+      }
+    },
+    {
+      "name": "write",
+      "ir": {
+        "id": "00000000-0000-0000-0000-0000000000aa",
+        "name": "t",
+        "nl_source": "Write file notes.txt with contents hi",
+        "goal": {
+          "description": "t",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000ab",
+            "name": "Write",
+            "description": "hi",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.write"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 10,
+            "target_path": "scratch/notes.txt",
+            "effects": [
+              {
+                "type": "write",
+                "path": "scratch/notes.txt",
+                "size_bytes": 2
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.0,
+        "requires_approval": false,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "expected": {
+        "template": "Write file notes.txt with contents {{slot}}",
+        "slot": "description"
+      }
+    },
+    {
+      "name": "read",
+      "ir": {
+        "id": "00000000-0000-0000-0000-0000000000aa",
+        "name": "t",
+        "nl_source": "Read file notes.txt",
+        "goal": {
+          "description": "t",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000ab",
+            "name": "Read",
+            "description": "scratch/notes.txt",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.read"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 10,
+            "target_path": "scratch/notes.txt",
+            "effects": [
+              {
+                "type": "read",
+                "path": "scratch/notes.txt"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.0,
+        "requires_approval": false,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "expected": {
+        "template": "Read file {{slot}}",
+        "slot": "description"
+      }
+    },
+    {
+      "name": "fetch_refused",
+      "ir": {
+        "id": "00000000-0000-0000-0000-0000000000aa",
+        "name": "t",
+        "nl_source": "Fetch https://api.example.com/x",
+        "goal": {
+          "description": "t",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000ab",
+            "name": "Fetch",
+            "description": "https://api.example.com/x",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.http"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 10,
+            "target_path": "https://api.example.com/x",
+            "effects": [
+              {
+                "type": "fetch",
+                "url": "https://api.example.com/x"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.0,
+        "requires_approval": false,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "expected": {
+        "error": "fetch intents cannot become forms"
+      }
+    }
+  ],
+  "shadow_diff_cases": [
+    {
+      "name": "redirect_matches",
+      "predicted": [
+        {
+          "kind": "write",
+          "path": "scratch/notes.txt",
+          "bytes": 5
+        }
+      ],
+      "actual": [
+        {
+          "kind": "write",
+          "path": "scratch/shadow/notes.txt",
+          "bytes": 5
+        }
+      ],
+      "expected": {
+        "match": true
+      }
+    },
+    {
+      "name": "bytes_differ",
+      "predicted": [
+        {
+          "kind": "write",
+          "path": "scratch/notes.txt",
+          "bytes": 5
+        }
+      ],
+      "actual": [
+        {
+          "kind": "write",
+          "path": "scratch/shadow/notes.txt",
+          "bytes": 9
+        }
+      ],
+      "expected": {
+        "match": false
+      }
+    },
+    {
+      "name": "kind_mismatch",
+      "predicted": [
+        {
+          "kind": "write",
+          "path": "scratch/notes.txt",
+          "bytes": 5
+        }
+      ],
+      "actual": [
+        {
+          "kind": "read",
+          "path": "scratch/shadow/notes.txt"
+        }
+      ],
+      "expected": {
+        "match": false
+      }
+    },
+    {
+      "name": "passthrough_read",
+      "predicted": [
+        {
+          "kind": "read",
+          "path": "scratch/notes.txt"
+        }
+      ],
+      "actual": [
+        {
+          "kind": "read",
+          "path": "scratch/notes.txt"
+        }
+      ],
+      "expected": {
+        "match": true
+      }
+    }
+  ]
+}

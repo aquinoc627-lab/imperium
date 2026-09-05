@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Annotated, Any, Literal, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -126,6 +126,44 @@ class CompensationAction(BaseModel):
     payload: dict[str, Any]
 
 
+class EchoEffect(BaseModel):
+    type: Literal["echo"]
+    text: str
+
+
+class WriteEffect(BaseModel):
+    type: Literal["write"]
+    path: str
+    size_bytes: int | None = None
+
+
+class ReadEffect(BaseModel):
+    type: Literal["read"]
+    path: str
+
+
+class AppendEffect(BaseModel):
+    type: Literal["append"]
+    path: str
+    size_bytes: int | None = None
+
+
+class ListEffect(BaseModel):
+    type: Literal["list"]
+    path: str
+
+
+class FetchEffect(BaseModel):
+    type: Literal["fetch"]
+    url: str
+
+
+Effect = Annotated[
+    Union[EchoEffect, WriteEffect, ReadEffect, AppendEffect, ListEffect, FetchEffect],
+    Field(discriminator="type"),
+]
+
+
 class Task(BaseModel):
     id: UUID
     name: str
@@ -134,6 +172,7 @@ class Task(BaseModel):
     capabilities: list[str] = Field(default_factory=list)
     dependencies: list[UUID] = Field(default_factory=list)
     estimated_duration_ms: int | None = None
+    effects: list[Effect] = Field(default_factory=list)
     retry_policy: RetryPolicy = Field(default_factory=RetryPolicy)
     compensation: CompensationAction | None = None
 
@@ -162,8 +201,8 @@ class IntentIR(BaseModel):
     def validate_structure(self) -> None:
         if not self.tasks:
             raise ValueError("Intent has no tasks")
-        if self.version != 1:
-            raise ValueError(f"Version mismatch: expected 1, found {self.version}")
+        if self.version not in (1, 2):
+            raise ValueError(f"Version mismatch: expected 1 or 2, found {self.version}")
         ids = {task.id for task in self.tasks}
         for task in self.tasks:
             for dep in task.dependencies:

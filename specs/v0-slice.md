@@ -1,6 +1,15 @@
 # IMPERIUM v0 slice (normative)
 
-Implemented in [`web/v0`](../web/v0). Specs `02`–`04` stay aspirational.
+Implemented in [`web/v0`](../web/v0) and canonically in `imperium-core::v0`.
+Specs `02`–`04` stay aspirational. Phase 7 extends this slice with dry-run
+previews — see [`07-dry-run.md`](07-dry-run.md). Phase 8 grows the capability
+surface — see [`08-breadth.md`](08-breadth.md). Phase 9 adds the user-authored
+semantic firewall — see [`09-policy.md`](09-policy.md). Phase 10 adds the
+ledger projection — see [`10-ledger.md`](10-ledger.md). Phase 11 adds
+capability synthesis and the scoped network — see
+[`11-synthesis.md`](11-synthesis.md). Phase 12 adds the probabilistic
+simulator — see [`12-simulation.md`](12-simulation.md). Phase 13 adds the
+evolution loop — see [`13-evolution.md`](13-evolution.md).
 
 ## Allowed intents
 

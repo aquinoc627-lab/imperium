@@ -37,7 +37,7 @@
     },
     "risk_score": { "type": "number", "minimum": 0, "maximum": 1 },
     "requires_approval": { "type": "boolean" },
-    "version": { "type": "integer", "const": 1 },
+    "version": { "type": "integer", "enum": [1, 2] },
     "compiled_at": { "type": "string", "format": "date-time" },
     "compiler_version": { "type": "string" }
   },
@@ -168,10 +168,80 @@
           "items": { "type": "string", "format": "uuid" }
         },
         "estimated_duration_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "target_path": { "type": ["string", "null"] },
+        "effects": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              { "$ref": "#/$defs/EchoEffect" },
+              { "$ref": "#/$defs/WriteEffect" },
+              { "$ref": "#/$defs/ReadEffect" },
+              { "$ref": "#/$defs/AppendEffect" },
+              { "$ref": "#/$defs/ListEffect" },
+              { "$ref": "#/$defs/FetchEffect" }
+            ]
+          }
+        },
         "retry_policy": { "$ref": "#/$defs/RetryPolicy" },
         "compensation": {
           "anyOf": [{ "$ref": "#/$defs/CompensationAction" }, { "type": "null" }]
         }
+      }
+    },
+    "EchoEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text"],
+      "properties": {
+        "type": { "const": "echo" },
+        "text": { "type": "string" }
+      }
+    },
+    "WriteEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path"],
+      "properties": {
+        "type": { "const": "write" },
+        "path": { "type": "string" },
+        "size_bytes": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "ReadEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path"],
+      "properties": {
+        "type": { "const": "read" },
+        "path": { "type": "string" }
+      }
+    },
+    "AppendEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path"],
+      "properties": {
+        "type": { "const": "append" },
+        "path": { "type": "string" },
+        "size_bytes": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "ListEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path"],
+      "properties": {
+        "type": { "const": "list" },
+        "path": { "type": "string" }
+      }
+    },
+    "FetchEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "url"],
+      "properties": {
+        "type": { "const": "fetch" },
+        "url": { "type": "string" }
       }
     },
     "RetryPolicy": {

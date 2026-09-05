@@ -39,6 +39,12 @@ impl TaskId {
     }
 }
 
+impl Default for TaskId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl std::fmt::Display for TaskId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
@@ -79,7 +85,7 @@ impl IntentIR {
         if !(0.0..=1.0).contains(&self.risk_score) {
             return Err(IntentValidationError::InvalidRiskScore(self.risk_score));
         }
-        if self.version != crate::PROTOCOL_VERSION {
+        if !crate::ACCEPTED_PROTOCOL_VERSIONS.contains(&self.version) {
             return Err(IntentValidationError::VersionMismatch {
                 expected: crate::PROTOCOL_VERSION,
                 found: self.version,
@@ -139,9 +145,8 @@ impl IntentIR {
 
     /// Hash the JSON form of the IR (hash field excluded by serde skip).
     pub fn compute_hash(&mut self) -> Result<IntentHash, IntentValidationError> {
-        let bytes = serde_json::to_vec(self).map_err(|e| {
-            IntentValidationError::InvalidTaskReference(e.to_string())
-        })?;
+        let bytes = serde_json::to_vec(self)
+            .map_err(|e| IntentValidationError::InvalidTaskReference(e.to_string()))?;
         let hash = IntentHash(*blake3::hash(&bytes).as_bytes());
         self.hash = Some(hash);
         Ok(hash)
@@ -248,6 +253,33 @@ pub enum ThresholdOperator {
     NotEqual,
 }
 
+/// Declarative effect a task will produce. The dry-run simulator folds
+/// these into an exact preview before any execution occurs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Effect {
+    /// Emit text to the intent output.
+    Echo { text: String },
+    /// Persist content at a (scratch-relative) path.
+    Write {
+        path: String,
+        #[serde(default)]
+        size_bytes: Option<u64>,
+    },
+    /// Read a file under a granted prefix.
+    Read { path: String },
+    /// Append content to a file (create if missing); never truncates.
+    Append {
+        path: String,
+        #[serde(default)]
+        size_bytes: Option<u64>,
+    },
+    /// List entries of a directory under a granted prefix.
+    List { path: String },
+    /// GET an https URL (hostname must be policy-allowlisted).
+    Fetch { url: String },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub id: TaskId,
@@ -262,6 +294,8 @@ pub struct Task {
     pub estimated_duration_ms: Option<u64>,
     #[serde(default)]
     pub target_path: Option<String>,
+    #[serde(default)]
+    pub effects: Vec<Effect>,
     #[serde(default)]
     pub retry_policy: RetryPolicy,
     #[serde(default)]
@@ -340,15 +374,13 @@ mod tests {
     use std::path::PathBuf;
 
     fn fixture_dir() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/contract/intent_ir")
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/contract/intent_ir")
     }
 
     fn load(name: &str) -> IntentIR {
         let path = fixture_dir().join(name);
-        let data = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-            panic!("failed to read {}: {e}", path.display())
-        });
+        let data = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
         serde_json::from_str(&data).expect("fixture deserializes")
     }
 
@@ -394,6 +426,7 @@ mod tests {
                 dependencies: vec![b],
                 estimated_duration_ms: None,
                 target_path: None,
+                effects: vec![],
                 retry_policy: RetryPolicy::default(),
                 compensation: None,
             },
@@ -406,6 +439,7 @@ mod tests {
                 dependencies: vec![a],
                 estimated_duration_ms: None,
                 target_path: None,
+                effects: vec![],
                 retry_policy: RetryPolicy::default(),
                 compensation: None,
             },

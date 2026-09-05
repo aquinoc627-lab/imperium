@@ -37,7 +37,14 @@ export interface VerifyResult {
   reason: VerifyReason;
 }
 
-export const ALLOWED_CAPABILITIES = ["cap.echo", "cap.write"] as const;
+export const ALLOWED_CAPABILITIES = [
+  "cap.echo",
+  "cap.write",
+  "cap.read",
+  "cap.append",
+  "cap.list",
+  "cap.http",
+] as const;
 
 export const V0_GRANT: Permissions = {
   fs: [],
@@ -51,8 +58,23 @@ export const WRITE_GRANT: Permissions = {
   env: [],
 };
 
+/** Ceiling for cap.http: the user may declare specific hosts (grants file). */
+export const HTTP_GRANT: Permissions = {
+  fs: [],
+  net: ["*"],
+  env: [],
+};
+
 export function grantForCapability(capability: string): Permissions {
-  if (capability === "cap.write") return WRITE_GRANT;
+  if (
+    capability === "cap.write" ||
+    capability === "cap.read" ||
+    capability === "cap.append" ||
+    capability === "cap.list"
+  ) {
+    return WRITE_GRANT;
+  }
+  if (capability === "cap.http") return HTTP_GRANT;
   return V0_GRANT;
 }
 
@@ -139,7 +161,9 @@ export function isPermissionSubset(
   granted: Permissions,
 ): boolean {
   const fsOk = requested.fs.every((p) => pathAllowed(p, granted.fs));
-  const netOk = requested.net.every((h) => granted.net.includes(h));
+  const netOk = requested.net.every((h) =>
+    granted.net.some((g) => g === "*" || g === h),
+  );
   const envOk = requested.env.every((k) => granted.env.includes(k));
   return fsOk && netOk && envOk;
 }
@@ -180,7 +204,8 @@ export async function verifyToken(
   ) {
     return { ok: false, reason: "unknown capability" };
   }
-  if (token.permissions.net.length > 0) {
+  // Network floor: only cap.http may ever carry net permissions.
+  if (token.permissions.net.length > 0 && token.capability !== "cap.http") {
     return { ok: false, reason: "network denied" };
   }
   const grant = ctx.grant ?? V0_GRANT;

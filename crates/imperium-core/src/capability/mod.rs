@@ -90,8 +90,8 @@ pub struct DeclaredCapabilities {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkCapability {
-    pub host_pattern: String,  // e.g., "api.github.com", "*.example.com"
-    pub port: Option<u16>,     // None = any
+    pub host_pattern: String, // e.g., "api.github.com", "*.example.com"
+    pub port: Option<u16>,    // None = any
     pub protocol: NetworkProtocol,
     pub tls_required: bool,
     pub description: String,
@@ -109,7 +109,7 @@ pub enum NetworkProtocol {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultCapability {
-    pub path_pattern: String,  // e.g., "notes/*", "projects/secret/*"
+    pub path_pattern: String, // e.g., "notes/*", "projects/secret/*"
     pub permissions: Vec<VaultPermission>,
     pub description: String,
 }
@@ -126,7 +126,7 @@ pub enum VaultPermission {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShellCapability {
-    pub command: String,        // e.g., "git", "gh", "kubectl"
+    pub command: String,           // e.g., "git", "gh", "kubectl"
     pub args_pattern: Vec<String>, // Patterns like ["commit", "-m", "*"]
     pub working_dir: Option<String>,
     pub timeout_ms: u64,
@@ -135,7 +135,7 @@ pub struct ShellCapability {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecretCapability {
-    pub name: String,           // e.g., "GITHUB_TOKEN", "AWS_SECRET_KEY"
+    pub name: String, // e.g., "GITHUB_TOKEN", "AWS_SECRET_KEY"
     pub description: String,
     pub required: bool,
 }

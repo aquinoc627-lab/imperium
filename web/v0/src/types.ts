@@ -47,6 +47,14 @@ export type TaskKind =
   | "Notification"
   | "Custom";
 
+export type Effect =
+  | { type: "echo"; text: string }
+  | { type: "write"; path: string; size_bytes: number | null }
+  | { type: "read"; path: string }
+  | { type: "append"; path: string; size_bytes: number | null }
+  | { type: "list"; path: string }
+  | { type: "fetch"; url: string };
+
 export interface Task {
   id: string;
   name: string;
@@ -56,6 +64,7 @@ export interface Task {
   dependencies: string[];
   estimated_duration_ms: number | null;
   target_path: string | null;
+  effects?: Effect[];
 }
 
 export interface IntentIR {
@@ -77,16 +86,26 @@ export interface IntentIR {
   tasks: Task[];
   risk_score: number;
   requires_approval: boolean;
-  version: 1;
+  version: 1 | 2;
   compiled_at: string;
   compiler_version: string;
 }
+
+export type EffectPreview =
+  | { kind: "echo"; text: string }
+  | { kind: "write"; path: string; bytes: number }
+  | { kind: "read"; path: string }
+  | { kind: "append"; path: string; bytes: number }
+  | { kind: "list"; path: string }
+  | { kind: "fetch"; url: string }
+  | { kind: "denied"; capability: string; path: string; reason: string };
 
 export interface SimulationResult {
   success_probability: number;
   risk: number;
   duration_ms: number;
   notes: string[];
+  effects_preview?: EffectPreview[];
 }
 
 export interface TokenSummary {

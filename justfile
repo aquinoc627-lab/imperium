@@ -16,14 +16,19 @@ test-v0-js:
 
 test-v0-rust:
 	cargo test -p imperium-core --lib
+	cargo test -p imperium-store
 	cargo test -p imperium-cli
+
+# Regenerate web/v0/src/guest-bytes.ts (validates the historical baseline first)
+assemble-guest:
+	node scripts/assemble-guest.mjs
 
 test-v0: test-v0-js test-v0-rust
 	bash scripts/v0-smoke.sh
 
 # --- Build ---
 build-rust:
-	cargo build -p imperium-core -p imperium-cli
+	cargo build -p imperium-core -p imperium-store -p imperium-cli
 
 build-python:
 	cd python && uv pip compile pyproject.toml -o requirements.txt && uv pip install -r requirements.txt
@@ -34,6 +39,7 @@ build-frontend:
 # --- Other tests (scaffolding; expect gaps) ---
 test-rust:
 	cargo test -p imperium-core --lib
+	cargo test -p imperium-store
 	cargo test -p imperium-cli
 
 test-python:
@@ -44,7 +50,7 @@ test-frontend:
 
 # --- Lint/Format ---
 fmt-rust:
-	cargo fmt -p imperium-core -p imperium-cli
+	cargo fmt -p imperium-core -p imperium-store -p imperium-cli
 
 fmt-python:
 	cd python && uv run ruff format . && uv run ruff check --fix .
@@ -53,7 +59,7 @@ fmt-frontend:
 	cd frontend && pnpm format
 
 lint-rust:
-	cargo clippy -p imperium-core -p imperium-cli --all-targets -- -D warnings
+	cargo clippy -p imperium-core -p imperium-store -p imperium-cli --all-targets -- -D warnings
 
 lint-python:
 	cd python && uv run ruff check . && uv run mypy .

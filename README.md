@@ -30,29 +30,140 @@ bash scripts/v0-smoke.sh
 ```bash
 cargo run -p imperium-cli -- init
 cargo run -p imperium-cli -- intent compile --input "Echo this message: ping"
-cargo run -p imperium-cli -- intent simulate --intent-id <id>
-cargo run -p imperium-cli -- intent approve --intent-id <id>
+cargo run -p imperium-cli -- intent simulate --intent-id <id>          # exact dry-run preview
+cargo run -p imperium-cli -- intent simulate --intent-id <id> --json   # preview as JSON
+cargo run -p imperium-cli -- intent approve --intent-id <id>           # re-shows the preview
 cargo run -p imperium-cli -- intent execute --intent-id <id>
 cargo run -p imperium-cli -- intent replay --intent-id <id>
 ```
+
+`simulate` folds a hypothetical event stream (`dry_run: true`, never persisted)
+into an exact effects preview — e.g. `write scratch/notes.txt (5 bytes)` — and
+any path denial is reported *at simulation*, before a token can exist. Approval
+re-displays the same preview: consent is to a specific diff.
 
 Canonical intents:
 
 ```
 Echo this message: ping
 Write file notes.txt with contents hello
+Read file notes.txt
+Append file log.txt with contents tail
+List files under notes_dir
 ```
 
-`Write file ../secret with contents x` is rejected. Network is deny-all. Execute without approve, or after revoke, fails.
+`Write file ../secret with contents x` is rejected. Every path is confined
+to `scratch/`; sensitive files (`*.key`, `*secret*`, `.env*`) are denied at
+the host layer for every capability. Network is deny-all. Execute without
+approve (for high-risk verbs, or after revoke) fails. Low-risk verbs
+(echo/read/list) auto-approve on execute — audited as
+`IntentApproved {auto: true}`. Grants live in `.imperium/grants.json` and
+may only ever narrow the built-in defaults (fail-closed).
+
+## The semantic firewall
+
+Write your own rules in `.imperium/policy.imp` (loaded fail-closed):
+
+```
+deny read matching scratch/notes*
+deny containing curl
+require approval append
+allow read under scratch/
+```
+
+Rules evaluate first-match-wins; every filesystem action — allowed or
+denied — records a `PolicyEvaluated` event explaining why. Inspect the
+rules and the decision chain:
+
+```bash
+cargo run -p imperium-cli -- policy lint
+cargo run -p imperium-cli -- policy explain --verb read --path scratch/notes.txt
+```
+
+## The ledger
+
+Every intent's full history is queryable. The SQLite ledger is a projection
+of the canonical records — delete it and `ledger rebuild` reproduces it.
+
+```bash
+cargo run -p imperium-cli -- search hello                 # by name/source/output
+cargo run -p imperium-cli -- show --intent-id <id>        # the full trace
+cargo run -p imperium-cli -- ledger stats                 # outcomes, caps, denials
+cargo run -p imperium-cli -- ledger rebuild               # rebuild the projection
+```
+
+Compiling the same intent a third time (any phrasing) emits a
+`FrictionDetected` event suggesting a reusable form.
+
+## Synthesis + scoped network
+
+Turn an OpenAPI spec into a registered capability manifest (deterministic
+codegen, seeded property tests):
+
+```bash
+cargo run -p imperium-cli -- capabilities add --spec spec.json --name my_api
+cargo run -p imperium-cli -- capabilities approve --name my_api
+cargo run -p imperium-cli -- capabilities list
+```
+
+`Fetch <https-url>` is the first network intent — hardened at compile time
+(https only, no IPs/localhost/ports) and **default-deny**: nothing is
+fetchable until you both declare the host in `.imperium/grants.json` and
+allowlist it in `.imperium/policy.imp`:
+
+```
+allow fetch to api.example.com
+```
+
+Every fetch is explicitly approved and audited. The model can never propose
+network access. `ALLOW_CLOUD_ROUTING` stays `false` in code.
+
+## The simulator
+
+`intent simulate --trials N` runs a seeded Monte Carlo over the intent's
+task graph — success probability from observed history (Laplace-smoothed,
+with per-task factor notes), retry-aware, reproducible per seed. The world
+model is a pure view over the event log (`world show`); nothing is stored
+outside the fold. Probabilistic simulations approve only at
+`p_success >= 0.9` (integer-exact); hard denials always pass through.
+
+```bash
+cargo run -p imperium-cli -- intent simulate --intent-id <id> --trials 1000
+cargo run -p imperium-cli -- world
+```
+
+## The evolution loop
+
+Friction gets a human-gated response, never autonomy. Intents that differ
+only in content trigger `FrictionDetected`; save the reusable form, run it
+through the full gauntlet, and prove it with shadow runs:
+
+```bash
+cargo run -p imperium-cli -- forms save <intent-id> --name my_form
+cargo run -p imperium-cli -- forms run my_form --slot "new text"     # compile + simulate
+cargo run -p imperium-cli -- intent execute --shadow --intent-id <id> # redirected + verified
+cargo run -p imperium-cli -- forms list                              # runs / verified badge
+```
+
+Shadow runs redirect destructive effects under `scratch/shadow/` and fold a
+`ShadowVerified` diff (promise vs reality) without advancing the intent.
+No auto-promotion, no LLM patching — every execution stays a human decision.
 
 ## Status
 
 | Area | Status |
 |------|--------|
-| v0 loop (`web/v0` + `imperium-cli`) | **Working** — `just v0` |
-| Intent IR types (Rust + Python) | Usable — shared schema + fixtures |
-| Rules compiler / tokens / replay | **Working** in `web/v0` and `imperium-cli` |
-| WASM guest | **Working** in `web/v0`; CLI uses the same host rules |
+| v0 loop (`imperium-core` + `imperium-cli`, TS reference in `web/v0`) | **Working** — `just v0` |
+| Shared contract fixtures (TS + Rust) | **Working** — `tests/contract/v0_kernel.json` |
+| Intent IR types (Rust + Python) | Usable — shared schema + fixtures; IR v2 effects |
+| Rules compiler / tokens / dry-run preview / replay | **Working** — canonical in `imperium-core::v0` |
+| Capability breadth (read/append/list, sensitive firewall, risk-by-verb, grants) | **Working** — `specs/08-breadth.md` |
+| Semantic firewall (`.imp` policy, lint/explain, `PolicyEvaluated` audit) | **Working** — `specs/09-policy.md` |
+| Ledger (SQLite projection, search/show/stats/rebuild, friction signal) | **Working** — `specs/10-ledger.md` |
+| Synthesis + scoped network (`cap.http`, OpenAPI manifests, property tests) | **Working** — `specs/11-synthesis.md` |
+| Simulator (seeded Monte Carlo, world facts view, probabilistic gate) | **Working** — `specs/12-simulation.md` |
+| Evolution loop (slot-aware friction, forms, shadow verification) | **Working** — `specs/13-evolution.md` |
+| WASM guest | **Working** in `web/v0` (echo/write/read/append/list host imports); CLI uses the same host rules |
 | Daemon / frontend workbench / unused crates | Scaffold or mock |
 | Air-gap, SLSA, TPM, Sigstore | Targets, not implemented |
 

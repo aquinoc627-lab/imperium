@@ -1,5 +1,6 @@
 //! IMPERIUM CLI — v0 intent loop is real; other verbs fail closed.
 
+mod mcp;
 mod v0_cmd;
 
 use anyhow::{bail, Context, Result};
@@ -62,6 +63,8 @@ enum Commands {
     },
     /// The world model: observed facts computed from the event log (Phase 12)
     World,
+    /// Serve the kernel as MCP tools over stdio (Phase 14)
+    Mcp,
 }
 
 #[derive(Subcommand)]
@@ -240,6 +243,9 @@ fn main() -> Result<()> {
         }
         Commands::Show { intent_id } => show_intent(&home, &intent_id)?,
         Commands::World => world_show(&home)?,
+        Commands::Mcp => {
+            mcp::McpServer::new(home).serve()?;
+        }
         Commands::Forms { command } => match command {
             FormsCommands::Save { intent_id, name } => {
                 let t = home.save_form(&intent_id, &name)?;

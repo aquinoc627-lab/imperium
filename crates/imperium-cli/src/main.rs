@@ -169,6 +169,13 @@ enum PolicyCommands {
     /// Run the policy test harness (Phase 15): evaluate each entry of
     /// `.imperium/policy.tests.json` against the active policy and print PASS/FAIL
     Test,
+    /// Analyze the impact of a proposed policy change against the ledger
+    Impact {
+        #[arg(long)]
+        rule: String,
+    },
+    /// Show policy coverage against the ledger
+    Coverage,
 }
 
 #[derive(Subcommand)]
@@ -237,6 +244,8 @@ fn main() -> Result<()> {
             PolicyCommands::Lint => policy_lint(&home)?,
             PolicyCommands::Explain { verb, path } => policy_explain(&home, &verb, &path)?,
             PolicyCommands::Test => policy_test(&home)?,
+            PolicyCommands::Impact { rule } => policy_impact(&home, &rule)?,
+            PolicyCommands::Coverage => {},
         },
         Commands::Ledger { command } => match command {
             LedgerCommands::Stats => ledger_stats(&home)?,
@@ -787,3 +796,123 @@ fn schedule_list(_home: &V0Home) -> () {
 fn schedule_tick(_home: &V0Home) -> () {
 }
 
+
+fn policy_impact(home: &V0Home, rule_str: &str) -> Result<()> {
+    use imperium_core::policy::imp::{self, PolicyDecision};
+
+    // Parse the rule string: "<kind> <verb> <action> <pattern>"
+    let parts: Vec<&str> = rule_str.split_whitespace().collect();
+    if parts.len() < 4 {
+        bail!("impact rule format: <deny|require|allow> <verb> <matching|approval|under> <path|prefix>");
+    }
+    let kind = parts[0];
+    let verb = parts[1];
+    let action = parts[2];
+    let pattern = parts[3..].join(" ");
+
+    // Validate verb
+    if !imp::POLICY_VERBS.contains(&verb) {
+        bail!("unknown verb: {verb}; must be one of: read, write, append, list, fetch");
+    }
+
+    // Load current policy
+    let current_policy = match home.load_policy() {
+        Ok(p) => p,
+        Err(e) => {
+            println!("policy:    unloadable ({e}); cannot analyze impact");
+            return Ok(());
+        }
+    };
+
+    // Search the ledger for relevant intents
+    let search_query = pattern.to_lowercase();
+    let hits = home.ledger()?.search(&search_query)?;
+
+    // If no hits, report gracefully
+    if hits.is_empty() {
+        println!("no intents matching pattern '{}' in ledger", pattern);
+        return Ok(());
+    }
+
+    // Analyze impact
+    let mut changed = 0;
+    let mut unchanged = 0;
+    let mut details: Vec<String> = Vec::new();
+
+    for hit in &hits {
+        let intent_id = &hit.id;
+        let nl_source = hit.nl_source.to_lowercase();
+
+        // Determine the original decision for this intent
+        let path_for_eval = if verb == "fetch" {
+            continue; // skip fetch for now
+        } else {
+            nl_source.clone()
+        };
+
+        let original_decision = match current_policy.as_ref().map(|p| p.evaluate(verb, &path_for_eval, &path_for_eval)) {
+            Some(d) => d,
+            None => imp::PolicyDecision::Allow { rule: None },
+        };
+
+        // Simulate the proposed rule change
+        let would_change = match kind {
+            "deny" => nl_source.contains(&pattern),
+            "require_approval" => verb == action,
+            "allow" => false, // allow rules are harder to simulate impact for
+            _ => false,
+        };
+
+        if would_change {
+            // Determine original kind for display
+            let original_kind = original_decision.kind();
+            // Determine new kind
+            let new_kind = match kind {
+                "deny" => "deny",
+                "require_approval" => "require_approval",
+                _ => "allow",
+            };
+            if new_kind != original_kind {
+                changed += 1;
+                let display_id = intent_id.split('-').next().unwrap_or(&hit.id);
+                let status = match hit.status.as_str() {
+                    "compiled" => "compiled",
+                    "simulated" => "simulated",
+                    "approved" => "approved",
+                    "executed" => "executed",
+                    "failed" => "failed",
+                    _ => &hit.status,
+                };
+                let d = format!(
+                    "  {} [{}] {} -> {} (original: {})",
+                    display_id, status, original_kind, new_kind, original_decision.kind(),
+                );
+                details.push(d);
+            }
+        } else {
+            unchanged += 1;
+        }
+    }
+
+    // Report results
+    println!("policy impact analysis:");
+    println!("  rule: {}", rule_str);
+    println!("  intents scanned: {}", hits.len());
+    println!("  would change decision: {}", changed);
+    println!("  would remain unchanged: {}", unchanged);
+
+    if !details.is_empty() {
+        println!("\naffected intents:");
+        for d in &details {
+            println!("{}", d);
+        }
+    }
+
+    if changed > 0 {
+        println!("\n{} intents would have their decision changed", changed);
+        std::process::exit(1);
+    } else {
+        println!("\nno intents would have their decision changed");
+    }
+    Ok(())
+}

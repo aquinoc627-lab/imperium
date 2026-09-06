@@ -57,6 +57,9 @@ temp/
 *.pfx
 secrets/
 
+# IMPERIUM runtime home (token secret, ledger, intents, local grants)
+.imperium/
+
 # Model files (large binaries)
 models/
 *.bin

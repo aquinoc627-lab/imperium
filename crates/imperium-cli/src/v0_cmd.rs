@@ -13,6 +13,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::secret::SecretStore;
+
 fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -58,9 +60,16 @@ impl V0Home {
     pub fn init(&self) -> Result<()> {
         fs::create_dir_all(self.root.join("intents"))?;
         fs::create_dir_all(self.root.join("scratch"))?;
-        let secret = self.root.join("token.secret");
-        if !secret.exists() {
-            fs::write(&secret, uuid::Uuid::new_v4().to_string())?;
+        // Phase 18: the file secret is only materialized in file mode; the
+        // keychain backend provisions its secret on first signing use.
+        if matches!(
+            crate::secret::resolve_backend(&self.root),
+            Ok(crate::secret::Backend::File)
+        ) {
+            let secret = self.root.join("token.secret");
+            if !secret.exists() {
+                fs::write(&secret, crate::secret::generate_secret())?;
+            }
         }
         let grants = self.root.join("grants.json");
         if !grants.exists() {
@@ -122,12 +131,133 @@ impl V0Home {
         Ok(Some(policy))
     }
 
+    /// Resolve the signing secret via the configured backend (Phase 18).
+    /// Single chokepoint for every signing operation.
     fn secret(&self) -> Result<String> {
-        let path = self.root.join("token.secret");
-        if !path.exists() {
-            self.init()?;
+        match crate::secret::resolve_backend(&self.root)? {
+            crate::secret::Backend::File => {
+                let store = crate::secret::FileStore::new(&self.root);
+                if let Some(v) = store.get()? {
+                    return Ok(v);
+                }
+                let fresh = crate::secret::generate_secret();
+                store.put(&fresh)?;
+                Ok(fresh)
+            }
+            crate::secret::Backend::Keychain => {
+                let store = crate::secret::KeychainStore::new(&self.root);
+                if let Some(v) = store.get()? {
+                    return Ok(v);
+                }
+                // One-time migration from a legacy file secret.
+                let file = crate::secret::FileStore::new(&self.root);
+                let value = match file.get()? {
+                    Some(v) => v,
+                    None => crate::secret::generate_secret(),
+                };
+                store.put(&value)?;
+                file.delete()?;
+                Ok(value)
+            }
         }
-        Ok(fs::read_to_string(path)?.trim().to_string())
+    }
+
+    /// `imperium secret status` — the real posture, nothing created.
+    pub fn secret_status(&self) -> Result<String> {
+        let backend = crate::secret::resolve_backend(&self.root)?;
+        let file_present = self.root.join("token.secret").exists();
+        let detail = match backend {
+            crate::secret::Backend::File => {
+                let store = crate::secret::FileStore::new(&self.root);
+                match store.get()? {
+                    Some(v) => format!("file backend, fingerprint={}", crate::secret::fingerprint(&v)),
+                    None => "file backend, no secret yet (created on first use)".to_string(),
+                }
+            }
+            crate::secret::Backend::Keychain => {
+                let store = crate::secret::KeychainStore::new(&self.root);
+                match store.get()? {
+                    Some(v) => {
+                        let legacy = if file_present {
+                            " (WARNING: legacy token.secret still on disk)"
+                        } else {
+                            ""
+                        };
+                        format!(
+                            "keychain backend (OS-bound, not TPM-sealed), fingerprint={}{}",
+                            crate::secret::fingerprint(&v),
+                            legacy
+                        )
+                    }
+                    None => {
+                        if file_present {
+                            "keychain backend, secret not yet migrated (run `imperium secret bind`)"
+                                .to_string()
+                        } else {
+                            "keychain backend, no secret yet (created on first use)".to_string()
+                        }
+                    }
+                }
+            }
+        };
+        Ok(format!("backend={} {}", backend.label(), detail))
+    }
+
+    /// `imperium secret bind` — migrate the file secret into the keychain,
+    /// record the choice in the marker file, delete the plaintext file.
+    pub fn secret_bind(&self) -> Result<String> {
+        let store = crate::secret::KeychainStore::new(&self.root);
+        self.secret_bind_to(&store)
+    }
+
+    /// Injectable core of bind — tests use an in-memory store so the real
+    /// `security` CLI is never executed from the test suite.
+    pub fn secret_bind_to(&self, store: &dyn crate::secret::SecretStore) -> Result<String> {
+        let file = crate::secret::FileStore::new(&self.root);
+        let value = file
+            .get()?
+            .ok_or_else(|| anyhow!("no token.secret on disk to bind; nothing to do"))?;
+        store.put(&value)?;
+        file.delete()?;
+        fs::write(
+            self.root.join("secret.backend"),
+            crate::secret::Backend::Keychain.label(),
+        )?;
+        Ok(format!(
+            "bound to {} (fingerprint={}); token.secret removed; all previously issued tokens keep verifying; TPM sealing is out of scope",
+            store.label(),
+            crate::secret::fingerprint(&value)
+        ))
+    }
+
+    /// `imperium secret rotate` — fresh high-entropy secret in the active
+    /// backend. Previously issued tokens stop verifying (that is the point).
+    pub fn secret_rotate(&self) -> Result<String> {
+        let store: Box<dyn crate::secret::SecretStore> =
+            match crate::secret::resolve_backend(&self.root)? {
+                crate::secret::Backend::File => {
+                    Box::new(crate::secret::FileStore::new(&self.root))
+                }
+                crate::secret::Backend::Keychain => {
+                    Box::new(crate::secret::KeychainStore::new(&self.root))
+                }
+            };
+        self.secret_rotate_to(store.as_ref())
+    }
+
+    /// Injectable core of rotate.
+    pub fn secret_rotate_to(&self, store: &dyn crate::secret::SecretStore) -> Result<String> {
+        let fresh = crate::secret::generate_secret();
+        store.put(&fresh)?;
+        if store.label() != "file" {
+            // Off-file rotation must not leave a legacy plaintext copy behind.
+            crate::secret::FileStore::new(&self.root).delete()?;
+        }
+        Ok(format!(
+            "rotated in {} (fingerprint={}); WARNING: every previously issued token now fails verification",
+            store.label(),
+            crate::secret::fingerprint(&fresh)
+        ))
     }
 
     fn intent_path(&self, id: &str) -> PathBuf {
@@ -1842,5 +1972,93 @@ mod tests {
         assert_eq!(stats.failed, 1);
         assert_eq!(stats.top_denials[0].0, "revoked");
         assert_eq!(stats.top_denials[0].1, 1);
+    }
+
+    // ------------------- Phase 18: secret binding -------------------
+
+    #[test]
+    fn fresh_file_secret_is_high_entropy_hex() {
+        let home = tmp_home();
+        let path = home.root.join("token.secret");
+        let value = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(value.len(), 64);
+        assert!(value.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn signing_uses_the_file_secret_stably() {
+        let home = tmp_home();
+        let before = std::fs::read_to_string(home.root.join("token.secret")).unwrap();
+        let rec = home.compile("Echo this message: secret-smoke", false).unwrap();
+        let id = rec.ir.id.to_string();
+        home.simulate_opts(&id, None).unwrap();
+        home.approve(&id).unwrap();
+        home.execute(&id).unwrap();
+        // Signing must never regenerate or disturb the stored secret.
+        let after = std::fs::read_to_string(home.root.join("token.secret")).unwrap();
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn rotate_replaces_the_file_secret() {
+        let home = tmp_home();
+        let old = std::fs::read_to_string(home.root.join("token.secret")).unwrap();
+        let msg = home.secret_rotate().unwrap();
+        let new = std::fs::read_to_string(home.root.join("token.secret")).unwrap();
+        assert_ne!(old, new);
+        assert_eq!(new.len(), 64);
+        assert!(msg.contains("WARNING"));
+    }
+
+    #[test]
+    fn status_reports_file_posture_without_creating_anything() {
+        let home = tmp_home();
+        let fp = crate::secret::fingerprint(
+            &std::fs::read_to_string(home.root.join("token.secret")).unwrap(),
+        );
+        let status = home.secret_status().unwrap();
+        assert!(status.starts_with("backend=file"), "{status}");
+        assert!(status.contains(&fp), "{status}");
+
+        // A bare home (no secret yet) must report, not create.
+        let bare = std::env::temp_dir().join(format!("imperium-v0-{}", uuid::Uuid::new_v4()));
+        let home2 = V0Home { root: bare };
+        let status2 = home2.secret_status().unwrap();
+        assert!(status2.contains("no secret yet"), "{status2}");
+        assert!(!home2.root.join("token.secret").exists());
+    }
+
+    #[test]
+    fn bind_migrates_value_to_the_injected_store_and_removes_the_file() {
+        let home = tmp_home();
+        let legacy = std::fs::read_to_string(home.root.join("token.secret")).unwrap();
+        let store = crate::secret::MemoryStore::new();
+        let msg = home.secret_bind_to(&store).unwrap();
+        // Value preserved, plaintext gone, choice recorded.
+        assert_eq!(store.get().unwrap().as_deref(), Some(legacy.as_str()));
+        assert!(!home.root.join("token.secret").exists());
+        let marker = std::fs::read_to_string(home.root.join("secret.backend")).unwrap();
+        assert_eq!(marker.trim(), "keychain");
+        assert!(msg.contains("bound to memory"));
+    }
+
+    #[test]
+    fn bind_with_no_file_secret_fails_cleanly() {
+        let bare = std::env::temp_dir().join(format!("imperium-v0-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&bare).unwrap();
+        let home = V0Home { root: bare };
+        let store = crate::secret::MemoryStore::new();
+        assert!(home.secret_bind_to(&store).is_err());
+        assert_eq!(store.get().unwrap(), None);
+    }
+
+    #[test]
+    fn rotate_via_keychain_clears_the_legacy_plaintext() {
+        let home = tmp_home();
+        let store = crate::secret::MemoryStore::new();
+        home.secret_rotate_to(&store).unwrap();
+        // Keychain-mode rotation must not leave a plaintext copy behind.
+        assert!(!home.root.join("token.secret").exists());
+        assert_eq!(store.get().unwrap().map(|v| v.len()), Some(64));
     }
 }

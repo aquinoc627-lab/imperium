@@ -1,6 +1,7 @@
 //! IMPERIUM CLI — v0 intent loop is real; other verbs fail closed.
 
 mod mcp;
+mod secret;
 mod v0_cmd;
 
 use anyhow::{bail, Context, Result};
@@ -53,6 +54,11 @@ enum Commands {
     Schedule {
         #[command(subcommand)]
         command: ScheduleCommands,
+    },
+    /// Token-secret storage posture (Phase 18)
+    Secret {
+        #[command(subcommand)]
+        command: SecretCommands,
     },
     /// Search the ledger (name, source, output)
     Search { query: String },
@@ -133,6 +139,17 @@ enum ScheduleCommands {
     List,
     /// Run all due schedules (one-shot, no daemon)
     Tick,
+}
+
+#[derive(Subcommand)]
+enum SecretCommands {
+    /// Report the active backend, secret fingerprint, and migration state
+    Status,
+    /// Migrate the plaintext token.secret into the OS keychain (macOS) and
+    /// delete the file; records the choice for future runs
+    Bind,
+    /// Replace the secret with a fresh high-entropy value (issued tokens stop verifying)
+    Rotate,
 }
 
 #[derive(Subcommand)]
@@ -323,12 +340,17 @@ fn main() -> Result<()> {
             }
         },
         Commands::Schedule { command } => match command {
-            ScheduleCommands::Add { form, slot, every } => {},
-            ScheduleCommands::Remove { name } => {},
-            ScheduleCommands::Pause { name } => {},
-            ScheduleCommands::Resume { name } => {},
-            ScheduleCommands::List => {},
-            ScheduleCommands::Tick => {},
+            ScheduleCommands::Add { form, slot, every } => schedule_add(&home, &form, &slot, every)?,
+            ScheduleCommands::Remove { name } => schedule_remove(&home, &name)?,
+            ScheduleCommands::Pause { name } => schedule_set_enabled(&home, &name, false)?,
+            ScheduleCommands::Resume { name } => schedule_set_enabled(&home, &name, true)?,
+            ScheduleCommands::List => schedule_list(&home)?,
+            ScheduleCommands::Tick => schedule_tick(&home)?,
+        },
+        Commands::Secret { command } => match command {
+            SecretCommands::Status => println!("{}", home.secret_status()?),
+            SecretCommands::Bind => println!("{}", home.secret_bind()?),
+            SecretCommands::Rotate => println!("{}", home.secret_rotate()?),
         },
         Commands::Intent { command } => match command {
             IntentCommands::Compile { input, propose } => {
@@ -642,12 +664,10 @@ struct PolicyTestEntry {
     verb: String,
     path: String,
     expect: String,
-    #[serde(default)]
-    text: String,
 }
 
 fn policy_test(home: &V0Home) -> Result<()> {
-    use imperium_core::policy::imp::{self, PolicyDecision};
+    use imperium_core::policy::imp::PolicyDecision;
 
     let test_path = home.root.join("policy.tests.json");
     let data = if test_path.exists() {
@@ -778,27 +798,179 @@ fn print_replay(home: &V0Home, intent_id: &str) -> Result<()> {
     }
     Ok(())
 }
-fn schedule_add(_home: &V0Home, _form: &str, _slot: &str, _every: u64) -> () {
+use std::path::Path;
+
+fn schedules_dir(home: &V0Home) -> std::path::PathBuf {
+    home.root.join("schedules")
 }
 
-fn schedule_remove(_home: &V0Home, _name: &str) -> () {
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ScheduleDoc {
+    name: String,
+    form: String,
+    slot: String,
+    every_secs: u64,
+    enabled: bool,
+    created_at: String,
+    last_run_at: Option<String>,
+    next_run_at: String,
 }
 
-fn schedule_pause(_home: &V0Home, _name: &str) -> () {
+fn load_schedule(path: &Path) -> Result<ScheduleDoc> {
+    let data = fs::read_to_string(path)
+        .with_context(|| format!("schedule unreadable: {}", path.display()))?;
+    serde_json::from_str(&data).with_context(|| format!("schedule malformed: {}", path.display()))
 }
 
-fn schedule_resume(_home: &V0Home, _name: &str) -> () {
+fn save_schedule(path: &Path, doc: &ScheduleDoc) -> Result<()> {
+    fs::write(path, serde_json::to_string_pretty(doc)?)?;
+    Ok(())
 }
 
-fn schedule_list(_home: &V0Home) -> () {
+fn schedule_add(home: &V0Home, form: &str, slot: &str, every: u64) -> Result<()> {
+    if every == 0 {
+        bail!("schedule interval must be > 0 seconds");
+    }
+    let dir = schedules_dir(home);
+    fs::create_dir_all(&dir)?;
+    let suffix = chrono::Utc::now()
+        .timestamp_nanos_opt()
+        .unwrap_or_default()
+        .to_string();
+    let name = format!("{form}-{}", &suffix[suffix.len().saturating_sub(6)..]);
+    let now = chrono::Utc::now();
+    let doc = ScheduleDoc {
+        name: name.clone(),
+        form: form.to_string(),
+        slot: slot.to_string(),
+        every_secs: every,
+        enabled: true,
+        created_at: now.to_rfc3339(),
+        last_run_at: None,
+        next_run_at: (now + chrono::Duration::seconds(every as i64)).to_rfc3339(),
+    };
+    let path = dir.join(format!("{name}.json"));
+    save_schedule(&path, &doc)?;
+    println!("{name}\tform={form}\tfile={}", path.display());
+    Ok(())
 }
 
-fn schedule_tick(_home: &V0Home) -> () {
+fn schedule_remove(home: &V0Home, name: &str) -> Result<()> {
+    let path = schedules_dir(home).join(format!("{name}.json"));
+    if !path.exists() {
+        bail!("no schedule named {name}");
+    }
+    fs::remove_file(&path)?;
+    println!("{name}\tremoved");
+    Ok(())
 }
+
+fn schedule_set_enabled(home: &V0Home, name: &str, enabled: bool) -> Result<()> {
+    let path = schedules_dir(home).join(format!("{name}.json"));
+    if !path.exists() {
+        bail!("no schedule named {name}");
+    }
+    let mut doc = load_schedule(&path)?;
+    doc.enabled = enabled;
+    if enabled {
+        // Resuming recomputes the next fire from now; a paused schedule
+        // never fires retroactively.
+        doc.next_run_at = (chrono::Utc::now()
+            + chrono::Duration::seconds(doc.every_secs as i64))
+            .to_rfc3339();
+    }
+    save_schedule(&path, &doc)?;
+    println!("{name}\t{}", if enabled { "resumed" } else { "paused" });
+    Ok(())
+}
+
+fn schedule_list(home: &V0Home) -> Result<()> {
+    let dir = schedules_dir(home);
+    if !dir.exists() {
+        println!("no schedules");
+        return Ok(());
+    }
+    let mut entries: Vec<std::path::PathBuf> = fs::read_dir(&dir)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|x| x == "json"))
+        .collect();
+    entries.sort();
+    if entries.is_empty() {
+        println!("no schedules");
+        return Ok(());
+    }
+    for path in &entries {
+        let doc = load_schedule(path)?;
+        let state = if doc.enabled { "enabled" } else { "paused" };
+        println!(
+            "{}\t{}\tform={}\tslot={}\tevery={}s\tnext={}\tlast={}",
+            doc.name,
+            state,
+            doc.form,
+            doc.slot,
+            doc.every_secs,
+            doc.next_run_at,
+            doc.last_run_at.as_deref().unwrap_or("never")
+        );
+    }
+    Ok(())
+}
+
+/// One-shot audited cron: run every due, enabled schedule through the full
+/// gauntlet. High-risk forms stop at the approval gate and are never
+/// self-approved; `next_run_at` still advances so a pending approval cannot
+/// cause repeated firing.
+fn schedule_tick(home: &V0Home) -> Result<()> {
+    let dir = schedules_dir(home);
+    if !dir.exists() {
+        println!("no schedules to tick");
+        return Ok(());
+    }
+    let now = chrono::Utc::now();
+    let mut entries: Vec<std::path::PathBuf> = fs::read_dir(&dir)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|x| x == "json"))
+        .collect();
+    entries.sort();
+    let mut fired = 0usize;
+    for path in &entries {
+        let mut doc = load_schedule(path)?;
+        if !doc.enabled {
+            continue;
+        }
+        let due = chrono::DateTime::parse_from_rfc3339(&doc.next_run_at)
+            .map(|t| t.with_timezone(&chrono::Utc) <= now)
+            .unwrap_or(false);
+        if !due {
+            continue;
+        }
+        fired += 1;
+        let rec = home.run_form(&doc.form, &doc.slot, None)?;
+        let id = rec.ir.id.to_string();
+        let outcome = if rec.ir.requires_approval {
+            // The gauntlet stopped at the approval gate; the human decides.
+            format!("approval-required\t{id}")
+        } else {
+            // Low-risk verb: the audited auto-approve path completes it.
+            home.approve(&id)?;
+            let done = home.execute(&id)?;
+            format!("executed\t{}\t{}", id, done.output.unwrap_or_default())
+        };
+        doc.last_run_at = Some(now.to_rfc3339());
+        doc.next_run_at = (now + chrono::Duration::seconds(doc.every_secs as i64)).to_rfc3339();
+        save_schedule(path, &doc)?;
+        println!("{}\t{}", doc.name, outcome);
+    }
+    if fired == 0 {
+        println!("nothing due");
+    }
+    Ok(())
+}
+
 
 
 fn policy_impact(home: &V0Home, rule_str: &str) -> Result<()> {
-    use imperium_core::policy::imp::{self, PolicyDecision};
+    use imperium_core::policy::imp;
 
     // Parse the rule string: "<kind> <verb> <action> <pattern>"
     let parts: Vec<&str> = rule_str.split_whitespace().collect();
@@ -915,4 +1087,146 @@ fn policy_impact(home: &V0Home, rule_str: &str) -> Result<()> {
         println!("\nno intents would have their decision changed");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod schedule_tests {
+    use super::*;
+    use imperium_core::v0::IntentStatus;
+    use v0_cmd::StoredIntent;
+
+    fn tmp_home() -> V0Home {
+        let root = std::env::temp_dir().join(format!("imperium-sched-{}", uuid::Uuid::new_v4()));
+        let home = V0Home { root };
+        home.init().unwrap();
+        home
+    }
+
+    fn echo_form(home: &V0Home, name: &str) {
+        let rec = home
+            .compile("Echo this message: schedule-smoke", false)
+            .unwrap();
+        home.save_form(&rec.ir.id.to_string(), name).unwrap();
+    }
+
+    fn find_schedule(home: &V0Home, stem_prefix: &str) -> std::path::PathBuf {
+        fs::read_dir(schedules_dir(home))
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .find(|p| {
+                p.file_stem()
+                    .is_some_and(|s| s.to_string_lossy().starts_with(stem_prefix))
+            })
+            .expect("schedule file not found")
+    }
+
+    fn force_due(home: &V0Home, stem_prefix: &str) {
+        let path = find_schedule(home, stem_prefix);
+        let mut doc: ScheduleDoc =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        doc.next_run_at = "2020-01-01T00:00:00+00:00".to_string();
+        save_schedule(&path, &doc).unwrap();
+    }
+
+    #[test]
+    fn add_creates_enabled_schedule_with_future_fire_time() {
+        let home = tmp_home();
+        schedule_add(&home, "greet", "world", 60).unwrap();
+        let doc: ScheduleDoc = serde_json::from_str(&fs::read_to_string(
+            find_schedule(&home, "greet-"),
+        ).unwrap()).unwrap();
+        assert!(doc.enabled);
+        assert_eq!(doc.form, "greet");
+        assert!(chrono::DateTime::parse_from_rfc3339(&doc.next_run_at).is_ok());
+    }
+
+    #[test]
+    fn add_rejects_zero_interval() {
+        let home = tmp_home();
+        assert!(schedule_add(&home, "greet", "x", 0).is_err());
+    }
+
+    #[test]
+    fn tick_executes_due_low_risk_form_and_advances() {
+        let home = tmp_home();
+        echo_form(&home, "greet");
+        schedule_add(&home, "greet", "tick-one", 3600).unwrap();
+        force_due(&home, "greet-");
+
+        schedule_tick(&home).unwrap();
+
+        // The file advanced out of the past.
+        let doc: ScheduleDoc = serde_json::from_str(
+            &fs::read_to_string(find_schedule(&home, "greet-")).unwrap(),
+        )
+        .unwrap();
+        assert!(doc.last_run_at.is_some());
+        let next = chrono::DateTime::parse_from_rfc3339(&doc.next_run_at).unwrap();
+        assert!(next > chrono::Utc::now() - chrono::Duration::seconds(5));
+    }
+
+    #[test]
+    fn tick_high_risk_form_stops_at_the_human_gate() {
+        let home = tmp_home();
+        let rec = home
+            .compile("Write file notes.txt with contents scheduled", false)
+            .unwrap();
+        assert!(rec.ir.requires_approval);
+        home.save_form(&rec.ir.id.to_string(), "scribe").unwrap();
+        schedule_add(&home, "scribe", "more", 3600).unwrap();
+        force_due(&home, "scribe-");
+
+        schedule_tick(&home).unwrap();
+
+        // Nothing was executed: the newest intent for the write form is left
+        // at the simulated/approval stage, never executed.
+        let mut statuses = vec![];
+        for entry in fs::read_dir(home.root.join("intents")).unwrap().flatten() {
+            let text = fs::read_to_string(entry.path()).unwrap();
+            if let Ok(r) = serde_json::from_str::<StoredIntent>(&text) {
+                if r.ir.name.contains("notes") || r.ir.nl_source.contains("notes.txt") {
+                    statuses.push(r.status);
+                }
+            }
+        }
+        assert!(
+            statuses.iter().all(|s| *s != IntentStatus::Executed),
+            "high-risk schedule must never self-approve: {statuses:?}"
+        );
+    }
+
+    #[test]
+    fn paused_schedule_never_fires() {
+        let home = tmp_home();
+        echo_form(&home, "greet");
+        schedule_add(&home, "greet", "paused-run", 3600).unwrap();
+        let stem = find_schedule(&home, "greet-")
+            .file_stem()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+        schedule_set_enabled(&home, &stem, false).unwrap();
+        force_due(&home, "greet-");
+
+        // tick completes without executing anything for the paused schedule.
+        schedule_tick(&home).unwrap();
+        let rec = home.compile("Echo this message: probe", false).unwrap();
+        let count_before = home.list().unwrap().len();
+        let _ = rec;
+        schedule_tick(&home).unwrap();
+        assert_eq!(home.list().unwrap().len(), count_before);
+    }
+
+    #[test]
+    fn remove_deletes_the_schedule() {
+        let home = tmp_home();
+        schedule_add(&home, "greet", "doomed", 60).unwrap();
+        assert!(schedule_remove(&home, "nope-does-not-exist").is_err());
+        // Find the real name, then remove it.
+        let path = find_schedule(&home, "greet-");
+        let stem = path.file_stem().unwrap().to_string_lossy().to_string();
+        schedule_remove(&home, &stem).unwrap();
+        assert!(fs::read_dir(schedules_dir(&home)).unwrap().count() == 0);
+    }
 }

@@ -1,6 +1,6 @@
 # IMPERIUM v0 (working slice)
 
-This directory is the **only implemented product**. Rust crates and `frontend/workbench` remain scaffolding.
+This directory is the **TypeScript reference kernel**: every module mirrors its Rust counterpart in `imperium-core` and both are pinned to the shared fixtures in `tests/contract/v0_kernel.json`. The canonical product is the Rust CLI (`imperium-cli`).
 
 ## What works
 
@@ -39,4 +39,3 @@ Loose forms (`say hello`, `save notes.txt with hi`) go through `localPropose` fi
 
 - Not the Rust WASM/WASI host
 - Not air-gap / SLSA / TPM
-- Not the mock `frontend/workbench` pages

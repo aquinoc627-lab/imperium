@@ -4,7 +4,7 @@
 
 IMPERIUM compiles natural-language goals into an Intent IR, simulates, issues a capability token, and executes under those rights.
 
-**The working product is [`web/v0`](web/v0) plus `imperium-cli`.** Most other crates and the mock workbench are still scaffolding. See [`specs/STATUS.md`](specs/STATUS.md).
+**The working product is `imperium-cli`** (canonical Rust kernel) with the TypeScript reference kernel in [`web/v0`](web/v0) and a zero-install browser slice in [`web/workbench`](web/workbench). The mock `frontend/workbench` has been removed. See [`specs/STATUS.md`](specs/STATUS.md).
 
 ## After clone
 
@@ -149,6 +149,57 @@ Shadow runs redirect destructive effects under `scratch/shadow/` and fold a
 `ShadowVerified` diff (promise vs reality) without advancing the intent.
 No auto-promotion, no LLM patching — every execution stays a human decision.
 
+## Governed tool surface (MCP)
+
+`imperium mcp` serves the kernel as Model Context Protocol tools over stdio
+(hand-rolled JSON-RPC 2.0 — no SDK): compile, simulate, execute (+shadow),
+search, stats, world, forms, policy lint/explain. **Approval is deliberately
+not a tool** — an agent can propose and simulate, but the human approves in
+the CLI.
+
+## Policy tests, impact, coverage
+
+```bash
+cargo run -p imperium-cli -- policy test                                  # PASS/FAIL .imperium/policy.tests.json
+cargo run -p imperium-cli -- policy impact --rule "deny read matching notes.txt"
+cargo run -p imperium-cli -- policy impact --rule "require approval write"
+cargo run -p imperium-cli -- policy coverage
+```
+
+`impact` reports which existing intents would flip decision if the rule were
+added (exit 1 when at least one would). Allow-rules are rejected fail-closed:
+first-match ordering makes them position-dependent — `policy explain` shows
+the live chain instead. `coverage` is a census of rules and ledger intents.
+
+## Scheduled intents (audited cron)
+
+```bash
+cargo run -p imperium-cli -- schedule add --form my_form --slot "today" --every 3600
+cargo run -p imperium-cli -- schedule list
+cargo run -p imperium-cli -- schedule tick    # one-shot; wire into cron/launchd
+cargo run -p imperium-cli -- schedule pause|resume|remove --name <name>
+```
+
+`tick` re-enters the full gauntlet for every due, enabled schedule. Low-risk
+forms execute through the audited auto-approve path; high-risk forms stop at
+the human approval gate and are **never self-approved** — `next_run_at`
+advances regardless so a pending approval cannot cause repeated firing.
+
+## Secret posture
+
+The HMAC secret that signs every capability token is configurable:
+
+```bash
+cargo run -p imperium-cli -- secret status   # backend, fingerprint, migration state
+cargo run -p imperium-cli -- secret bind     # migrate token.secret into the macOS Keychain, delete the file
+cargo run -p imperium-cli -- secret rotate   # fresh 256-bit secret; issued tokens stop verifying
+```
+
+Default is the legacy file backend; the keychain is opt-in (env var
+`IMPERIUM_SECRET_BACKEND` or the marker `bind` writes). Status honestly
+labels the keychain **OS-bound, not TPM-sealed** — TPM sealing is a separate
+named spec.
+
 ## Status
 
 | Area | Status |
@@ -163,9 +214,14 @@ No auto-promotion, no LLM patching — every execution stays a human decision.
 | Synthesis + scoped network (`cap.http`, OpenAPI manifests, property tests) | **Working** — `specs/11-synthesis.md` |
 | Simulator (seeded Monte Carlo, world facts view, probabilistic gate) | **Working** — `specs/12-simulation.md` |
 | Evolution loop (slot-aware friction, forms, shadow verification) | **Working** — `specs/13-evolution.md` |
+| MCP tool surface (stdio JSON-RPC, approval-free tool list) | **Working** — `specs/14-mcp.md` |
+| Diff preview + policy test harness | **Working** — `specs/15-preview-tests.md` |
+| Scheduled intents (audited cron, no self-approval) | **Working** — `specs/16-schedules.md` |
+| Policy impact + coverage analysis | **Working** — `specs/17-policy-impact.md` |
+| Secret binding (keychain opt-in, rotation, 256-bit secrets) | **Working** — `specs/18-secret-binding.md` |
 | WASM guest | **Working** in `web/v0` (echo/write/read/append/list host imports); CLI uses the same host rules |
-| Daemon / frontend workbench / unused crates | Scaffold or mock |
-| Air-gap, SLSA, TPM, Sigstore | Targets, not implemented |
+| Daemon and unused crates | Scaffold (not workspace members); mock workbench removed |
+| Air-gap, SLSA, TPM sealing, Sigstore | Targets, not implemented |
 
 ## Architecture
 

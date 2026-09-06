@@ -262,7 +262,7 @@ fn main() -> Result<()> {
             PolicyCommands::Explain { verb, path } => policy_explain(&home, &verb, &path)?,
             PolicyCommands::Test => policy_test(&home)?,
             PolicyCommands::Impact { rule } => policy_impact(&home, &rule)?,
-            PolicyCommands::Coverage => {},
+            PolicyCommands::Coverage => policy_coverage(&home)?,
         },
         Commands::Ledger { command } => match command {
             LedgerCommands::Stats => ledger_stats(&home)?,
@@ -969,123 +969,164 @@ fn schedule_tick(home: &V0Home) -> Result<()> {
 
 
 
-fn policy_impact(home: &V0Home, rule_str: &str) -> Result<()> {
+/// Parsed form of an `--rule` argument for `policy impact`.
+#[derive(Debug, PartialEq)]
+enum ImpactRule {
+    /// `deny <verb> matching <pattern>` — pattern matched as a substring of
+    /// the intent's natural-language source (documented simplification: the
+    /// ledger stores nl text, not resolved paths).
+    Deny { verb: String, pattern: String },
+    /// `require approval <verb>` (the canonical 3-token .imp form).
+    RequireApproval { verb: String },
+}
+
+fn parse_impact_rule(rule_str: &str) -> Result<ImpactRule> {
     use imperium_core::policy::imp;
-
-    // Parse the rule string: "<kind> <verb> <action> <pattern>"
     let parts: Vec<&str> = rule_str.split_whitespace().collect();
-    if parts.len() < 4 {
-        bail!("impact rule format: <deny|require|allow> <verb> <matching|approval|under> <path|prefix>");
-    }
-    let kind = parts[0];
-    let verb = parts[1];
-    let action = parts[2];
-    let pattern = parts[3..].join(" ");
-
-    // Validate verb
-    if !imp::POLICY_VERBS.contains(&verb) {
+    let rule = match parts.as_slice() {
+        ["deny", verb, "matching", rest @ ..] if !rest.is_empty() => ImpactRule::Deny {
+            verb: verb.to_string(),
+            pattern: rest.join(" "),
+        },
+        ["require", "approval", verb] => ImpactRule::RequireApproval {
+            verb: verb.to_string(),
+        },
+        ["allow", ..] => bail!(
+            "allow-rule impact is not simulated (first-match ordering makes it \
+             position-dependent); use `imperium policy explain` for the live chain"
+        ),
+        _ => bail!(
+            "impact rule format: `deny <verb> matching <pattern>` or `require approval <verb>`"
+        ),
+    };
+    let verb = match &rule {
+        ImpactRule::Deny { verb, .. } => verb,
+        ImpactRule::RequireApproval { verb } => verb,
+    };
+    if !imp::POLICY_VERBS.contains(&verb.as_str()) {
         bail!("unknown verb: {verb}; must be one of: read, write, append, list, fetch");
     }
+    Ok(rule)
+}
 
-    // Load current policy
-    let current_policy = match home.load_policy() {
-        Ok(p) => p,
-        Err(e) => {
-            println!("policy:    unloadable ({e}); cannot analyze impact");
-            return Ok(());
-        }
+/// Pure report for `policy impact`. Returns the printed report; `changed`
+/// counts intents whose decision would flip. Fetch verbs are skipped (the
+/// ledger does not store resolved URLs); hard denials can only tighten, so a
+/// deny rule reports allow/require_approval -> deny and a require-approval
+/// rule reports allow -> require_approval.
+fn policy_impact_report(home: &V0Home, rule: &ImpactRule) -> Result<(String, usize)> {
+    use imperium_core::policy::imp::PolicyDecision;
+
+    let (verb, describe) = match rule {
+        ImpactRule::Deny { verb, pattern } => (verb.as_str(), format!("deny {verb} matching {pattern}")),
+        ImpactRule::RequireApproval { verb } => (verb.as_str(), format!("require approval {verb}")),
     };
 
-    // Search the ledger for relevant intents
-    let search_query = pattern.to_lowercase();
-    let hits = home.ledger()?.search(&search_query)?;
-
-    // If no hits, report gracefully
-    if hits.is_empty() {
-        println!("no intents matching pattern '{}' in ledger", pattern);
-        return Ok(());
-    }
-
-    // Analyze impact
-    let mut changed = 0;
-    let mut unchanged = 0;
-    let mut details: Vec<String> = Vec::new();
+    let current_policy = home.load_policy()?;
+    let hits = home.ledger()?.search(verb)?; // intents mentioning this verb's capability family
+    let mut report = String::new();
+    let mut changed = 0usize;
 
     for hit in &hits {
-        let intent_id = &hit.id;
-        let nl_source = hit.nl_source.to_lowercase();
+        let nl = hit.nl_source.to_lowercase();
+        let original = current_policy
+            .as_ref()
+            .map(|p| p.evaluate(verb, &nl, &nl))
+            .unwrap_or(PolicyDecision::Allow { rule: None });
 
-        // Determine the original decision for this intent
-        let path_for_eval = if verb == "fetch" {
-            continue; // skip fetch for now
-        } else {
-            nl_source.clone()
-        };
-
-        let original_decision = match current_policy.as_ref().map(|p| p.evaluate(verb, &path_for_eval, &path_for_eval)) {
-            Some(d) => d,
-            None => imp::PolicyDecision::Allow { rule: None },
-        };
-
-        // Simulate the proposed rule change
-        let would_change = match kind {
-            "deny" => nl_source.contains(&pattern),
-            "require_approval" => verb == action,
-            "allow" => false, // allow rules are harder to simulate impact for
-            _ => false,
-        };
-
-        if would_change {
-            // Determine original kind for display
-            let original_kind = original_decision.kind();
-            // Determine new kind
-            let new_kind = match kind {
-                "deny" => "deny",
-                "require_approval" => "require_approval",
-                _ => "allow",
-            };
-            if new_kind != original_kind {
-                changed += 1;
-                let display_id = intent_id.split('-').next().unwrap_or(&hit.id);
-                let status = match hit.status.as_str() {
-                    "compiled" => "compiled",
-                    "simulated" => "simulated",
-                    "approved" => "approved",
-                    "executed" => "executed",
-                    "failed" => "failed",
-                    _ => &hit.status,
-                };
-                let d = format!(
-                    "  {} [{}] {} -> {} (original: {})",
-                    display_id, status, original_kind, new_kind, original_decision.kind(),
-                );
-                details.push(d);
+        let would_flip = match rule {
+            ImpactRule::Deny { pattern, .. } => {
+                original.kind() != "deny" && nl.contains(&pattern.to_lowercase())
             }
-        } else {
-            unchanged += 1;
+            ImpactRule::RequireApproval { .. } => original.kind() == "allow",
+        };
+        if !would_flip {
+            continue;
         }
+        changed += 1;
+        let new_kind = match rule {
+            ImpactRule::Deny { .. } => "deny",
+            ImpactRule::RequireApproval { .. } => "require_approval",
+        };
+        report.push_str(&format!(
+            "  {} [{}] {} -> {}\n",
+            hit.id.split('-').next().unwrap_or(&hit.id),
+            hit.status,
+            original.kind(),
+            new_kind
+        ));
     }
 
-    // Report results
-    println!("policy impact analysis:");
-    println!("  rule: {}", rule_str);
-    println!("  intents scanned: {}", hits.len());
-    println!("  would change decision: {}", changed);
-    println!("  would remain unchanged: {}", unchanged);
-
-    if !details.is_empty() {
-        println!("\naffected intents:");
-        for d in &details {
-            println!("{}", d);
-        }
+    let mut out = format!(
+        "policy impact analysis:\n  rule: {describe}\n  intents scanned: {}\n  would change decision: {changed}\n",
+        hits.len()
+    );
+    if !report.is_empty() {
+        out.push_str("\naffected intents:\n");
+        out.push_str(&report);
     }
+    Ok((out, changed))
+}
 
+fn policy_impact(home: &V0Home, rule_str: &str) -> Result<()> {
+    let rule = parse_impact_rule(rule_str)?;
+    let (report, changed) = policy_impact_report(home, &rule)?;
+    println!("{report}");
     if changed > 0 {
-        println!("\n{} intents would have their decision changed", changed);
+        println!("{changed} intent(s) would have their decision changed");
         std::process::exit(1);
-    } else {
-        println!("\nno intents would have their decision changed");
     }
+    println!("no intents would have their decision changed");
+    Ok(())
+}
+
+/// Pure summary for `policy coverage`: rule census by canonical form plus the
+/// ledger's intent census. Read-only; no decisions are re-evaluated.
+fn policy_coverage_report(home: &V0Home) -> Result<String> {
+    use std::collections::BTreeMap;
+    let policy = home.load_policy()?;
+    let hits = home.ledger()?.search("")?;
+
+    let mut rules: BTreeMap<String, usize> = BTreeMap::new();
+    let rule_count = policy.as_ref().map_or(0, |p| p.rules.len());
+    if let Some(p) = policy.as_ref() {
+        for r in &p.rules {
+            *rules.entry(r.canonical()).or_default() += 1;
+        }
+    }
+
+    let mut intents: BTreeMap<String, usize> = BTreeMap::new();
+    for hit in &hits {
+        let first = hit
+            .nl_source
+            .split_whitespace()
+            .next()
+            .unwrap_or("other")
+            .to_lowercase();
+        *intents.entry(first).or_default() += 1;
+    }
+
+    let mut out = format!(
+        "policy coverage:\n  intents in ledger: {}\n  policy rules: {rule_count}\n",
+        hits.len()
+    );
+    if rules.is_empty() {
+        out.push_str("  rules: (no policy.imp — built-in defaults only)\n");
+    } else {
+        out.push_str("  rules by form:\n");
+        for (form, n) in &rules {
+            out.push_str(&format!("    {form} x{n}\n"));
+        }
+    }
+    out.push_str("  intents by opening word:\n");
+    for (word, n) in &intents {
+        out.push_str(&format!("    {word} x{n}\n"));
+    }
+    Ok(out)
+}
+
+fn policy_coverage(home: &V0Home) -> Result<()> {
+    println!("{}", policy_coverage_report(home)?);
     Ok(())
 }
 
@@ -1228,5 +1269,85 @@ mod schedule_tests {
         let stem = path.file_stem().unwrap().to_string_lossy().to_string();
         schedule_remove(&home, &stem).unwrap();
         assert!(fs::read_dir(schedules_dir(&home)).unwrap().count() == 0);
+    }
+}
+
+#[cfg(test)]
+mod policy_tool_tests {
+    use super::*;
+
+    fn tmp_home() -> V0Home {
+        let root = std::env::temp_dir().join(format!("imperium-pol-{}", uuid::Uuid::new_v4()));
+        let home = V0Home { root };
+        home.init().unwrap();
+        home
+    }
+
+    #[test]
+    fn impact_parses_deny_and_require_approval_forms() {
+        assert_eq!(
+            parse_impact_rule("deny read matching notes.txt").unwrap(),
+            ImpactRule::Deny { verb: "read".into(), pattern: "notes.txt".into() }
+        );
+        assert_eq!(
+            parse_impact_rule("require approval write").unwrap(),
+            ImpactRule::RequireApproval { verb: "write".into() }
+        );
+        assert!(parse_impact_rule("deny read matching").is_err());
+        assert!(parse_impact_rule("deny hug matching x").is_err());
+        assert!(parse_impact_rule("allow read under scratch").is_err()); // fail-closed
+    }
+
+    #[test]
+    fn impact_flips_allow_to_deny_for_matching_nl_and_deny_stays_deny() {
+        let home = tmp_home();
+        let rec = home.compile("Read file sample.txt", false).unwrap();
+        let _ = rec;
+
+        // A deny on the path text must flip the read intent's decision.
+        let (report, changed) = policy_impact_report(&home, &ImpactRule::Deny {
+            verb: "read".into(),
+            pattern: "sample.txt".into(),
+        })
+        .unwrap();
+        assert_eq!(changed, 1);
+        assert!(report.contains("allow -> deny"), "{report}");
+
+        // A non-matching pattern changes nothing.
+        let (_, changed0) = policy_impact_report(&home, &ImpactRule::Deny {
+            verb: "read".into(),
+            pattern: "not-in-the-ledger".into(),
+        })
+        .unwrap();
+        assert_eq!(changed0, 0);
+    }
+
+    #[test]
+    fn impact_require_approval_flips_only_allows() {
+        let home = tmp_home();
+        // b.txt is already denied by policy (glob must match the full nl line);
+        // a.txt is an ordinary allow.
+        std::fs::write(home.root.join("policy.imp"), "deny read matching *b.txt*\n").unwrap();
+        home.compile("Read file a.txt", false).unwrap();
+        home.compile("Read file b.txt", false).unwrap();
+
+        let (report, changed) = policy_impact_report(&home, &ImpactRule::RequireApproval {
+            verb: "read".into(),
+        })
+        .unwrap();
+        assert_eq!(changed, 1, "{report}");
+        assert!(report.contains("allow -> require_approval"), "{report}");
+    }
+
+    #[test]
+    fn coverage_counts_rules_and_intents() {
+        let home = tmp_home();
+        home
+            .compile("Echo this message: coverage-probe", false)
+            .unwrap();
+        let out = policy_coverage_report(&home).unwrap();
+        assert!(out.contains("intents in ledger: 1"), "{out}");
+        assert!(out.contains("(no policy.imp"), "{out}");
+        assert!(out.contains("echo x1"), "{out}");
     }
 }

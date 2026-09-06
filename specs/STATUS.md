@@ -1,4 +1,4 @@
-# Honest status (2026-09-05)
+# Honest status (2026-09-06)
 
 The v0 vertical slice is implemented in [`web/v0`](../web/v0) as the TS
 reference; the **canonical kernel is Rust** (`imperium-core::v0`). Both are
@@ -20,6 +20,11 @@ validated against the shared fixtures in `tests/contract/v0_kernel.json`.
 | 11 | Synthesis + scoped network | Done — `specs/11-synthesis.md`. `cap.http` (`Fetch <https-url>`): URL hardening, default-deny policy allowlist (`allow fetch to <host>`), grants with `*` ceiling and closed init, token net floor, always-approved execution via injectable transport (ureq; tests never touch the network); OpenAPI → `CapabilityManifest` synthesis with deterministic WIT, seeded property tests, `capabilities add/approve/list` registry (registration grants nothing). |
 | 12 | The Simulator | Done — `specs/12-simulation.md`. Seeded Monte Carlo (`intent simulate --trials/--seed`) over retry dynamics; world facts as a pure view over the ledger (`world show`, `V0Event.at` timestamps); integer-exact probabilistic approval gate (`mc_gate`, p ≥ 0.9); hard denials pass through unchanged; Monte Carlo fixtures byte-identical across Rust (u64 LCG) and TS (BigInt LCG). |
 | 13 | The Evolution Loop | Done — `specs/13-evolution.md`. Slot-aware friction key (`capability|task|target`); human-saved forms (`forms save/run/list` — run re-enters the full gauntlet and stops for approval); shadow execution (`execute --shadow` redirects destructive effects under `scratch/shadow/`, folds `ShadowVerified` promise-vs-reality diff, never advances status, fetch refused); verified badge at ≥ 3 matching shadow runs (authorizes nothing). No auto-promotion, no LLM patches. |
+| 14 | MCP tool surface | Done — `specs/14-mcp.md`. Hand-rolled JSON-RPC 2.0 over stdio (`imperium mcp`); 11 tools reusing the same V0Home paths; approval deliberately absent from the tool list. Dispatcher unit-tested; in-band tool errors. |
+| 15 | Diff preview + policy test | Done — `specs/15-preview-tests.md`. Pure `diff_preview` helper in core (± lines, 20-line cap); `imperium policy test` evaluates `.imperium/policy.tests.json` entries against the active policy, PASS/FAIL, exit 1 on failure. |
+| 16 | Scheduled intents | Done — `specs/16-schedules.md`. `imperium schedule add/remove/pause/resume/list/tick` over `.imperium/schedules/*.json`; one-shot audited cron re-entering the full gauntlet; high-risk forms stop at the human approval gate and never self-approve; `next_run_at` advances on every fire. |
+| 17 | Policy impact & coverage | Done — `specs/17-policy-impact.md`. `policy impact --rule` (deny / require-approval forms; allow rejected fail-closed; exit 1 when a decision would flip) and `policy coverage` census; documented nl-as-path simplifications; pure report functions, unit-tested. |
+| 18 | Secret binding | Done — `specs/18-secret-binding.md`. `imperium secret status/bind/rotate`; opt-in macOS Keychain via the `security` CLI (injectable `SecretStore`; argv construction unit-tested without executing); env > marker > file resolution, fail-closed; fresh secrets 64-hex (~256 bits); status honestly labels the keychain OS-bound, not TPM-sealed. |
 
 ## Kernel consolidation (Phase 7)
 

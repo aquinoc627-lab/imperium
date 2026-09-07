@@ -1,6 +1,6 @@
 # IMPERIUM browser workbench
 
-Zero-install static UI for the v0 intent loop.
+Zero-install projector for the TypeScript reference kernel in `web/v0`.
 
 ```bash
 cd web/workbench
@@ -8,11 +8,29 @@ python3 -m http.server 8080
 # open http://127.0.0.1:8080
 ```
 
-Flow: **compile → propose → simulate → approve → execute → replay**
+`app.js` imports `kernel.js`, which is generated from `web/v0/src/browser-api.ts`.
+Do not add compiler, token, or WASM logic to `app.js`.
 
-- HMAC capability tokens (Web Crypto)
-- WASM guest for `cap.echo` / `cap.write`
-- Scratch files in memory for the session
-- Event log fold must match the intent snapshot
+```bash
+# regenerate kernel.js after changing web/v0 (requires esbuild)
+node scripts/emit-workbench-kernel.mjs
+```
 
-Kernel source of truth remains `web/v0` and the Rust CLI (`just v0`).
+## What this screen runs
+
+- Compile / propose / simulate / approve / execute / replay / revoke
+- Verbs the kernel already has: echo, write, read, append, list
+- Fetch compiles and dry-run default-denies. The workbench never performs network I/O.
+- Session `.imp` policy (lint + evaluate at simulate)
+- HMAC tokens via Web Crypto. Secret is random per page load and never stored.
+- Scratch is an in-memory `Map` for the tab
+- Shadow execute runs the guest without spending the token or advancing status
+- Low-risk verbs may auto-approve on execute (`IntentApproved {auto: true}`)
+
+## Not this screen
+
+Ledger SQLite, schedules, keychain bind, MCP stdio, OpenAPI registry files.
+Those stay in `imperium-cli`.
+
+Gate for kernel behavior remains `just v0` (`web/v0/src/workbench-bind.test.ts`
+locks the exports this UI calls).

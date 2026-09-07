@@ -23,6 +23,10 @@ test-v0-rust:
 assemble-guest:
 	node scripts/assemble-guest.mjs
 
+# Regenerate web/workbench/kernel.js from web/v0 (requires esbuild)
+emit-workbench-kernel:
+	node scripts/emit-workbench-kernel.mjs
+
 test-v0: test-v0-js test-v0-rust
 	bash scripts/v0-smoke.sh
 

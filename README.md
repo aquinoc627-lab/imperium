@@ -2,9 +2,17 @@
 
 > Local. Sovereign. Absolute.
 
-IMPERIUM compiles natural-language goals into an Intent IR, simulates, issues a capability token, and executes under those rights.
+IMPERIUM is a local intent runtime. A rules compiler maps a small set of
+canonical sentences onto an Intent IR, simulates the effects, issues an HMAC
+capability token on approval, and executes under those rights.
 
-**The working product is `imperium-cli`** (canonical Rust kernel) with the TypeScript reference kernel in [`web/v0`](web/v0) and a zero-install browser slice in [`web/workbench`](web/workbench). The mock `frontend/workbench` has been removed. See [`specs/STATUS.md`](specs/STATUS.md).
+`--propose` only rewrites close synonyms onto those sentences. It is not an
+open-ended language model. The six sentences the compiler accepts are listed
+under Manual CLI.
+
+**The working product is `imperium-cli`** (canonical Rust kernel) with the
+TypeScript reference kernel in [`web/v0`](web/v0) and a zero-install browser
+slice in [`web/workbench`](web/workbench). See [`specs/STATUS.md`](specs/STATUS.md).
 
 ## After clone
 
@@ -21,6 +29,7 @@ Without `just`:
 ```bash
 cd web/v0 && node --experimental-strip-types --test src/*.test.ts
 cargo test -p imperium-core --lib
+cargo test -p imperium-store
 cargo test -p imperium-cli
 bash scripts/v0-smoke.sh
 ```
@@ -50,6 +59,7 @@ Write file notes.txt with contents hello
 Read file notes.txt
 Append file log.txt with contents tail
 List files under notes_dir
+Fetch https://api.example.com
 ```
 
 `Write file ../secret with contents x` is rejected. Every path is confined

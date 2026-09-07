@@ -7,8 +7,11 @@ on:
       - "web/v0/**"
       - "crates/imperium-core/**"
       - "crates/imperium-cli/**"
-      - "Cargo.toml"
+      - "crates/imperium-store/**"
+      - "tests/contract/**"
+      - "schemas/**"
       - "scripts/v0-smoke.sh"
+      - "Cargo.toml"
       - "justfile"
       - ".github/workflows/v0.yaml"
   pull_request:
@@ -17,8 +20,11 @@ on:
       - "web/v0/**"
       - "crates/imperium-core/**"
       - "crates/imperium-cli/**"
-      - "Cargo.toml"
+      - "crates/imperium-store/**"
+      - "tests/contract/**"
+      - "schemas/**"
       - "scripts/v0-smoke.sh"
+      - "Cargo.toml"
       - "justfile"
       - ".github/workflows/v0.yaml"
   workflow_dispatch:
@@ -32,7 +38,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm test
+      - run: node --experimental-strip-types --test src/*.test.ts
         working-directory: web/v0
 
   rust:
@@ -41,7 +47,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy -p imperium-core -p imperium-store -p imperium-cli --all-targets -- -D warnings
       - run: cargo test -p imperium-core --lib
+      - run: cargo test -p imperium-store
       - run: cargo test -p imperium-cli
       - run: bash scripts/v0-smoke.sh

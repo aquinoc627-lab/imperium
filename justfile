@@ -30,13 +30,11 @@ test-v0: test-v0-js test-v0-rust
 build-rust:
 	cargo build -p imperium-core -p imperium-store -p imperium-cli
 
+# Python IR models only — not a product surface.
 build-python:
 	cd python && uv pip compile pyproject.toml -o requirements.txt && uv pip install -r requirements.txt
 
-build-frontend:
-	cd frontend && pnpm install && pnpm build
-
-# --- Other tests (scaffolding; expect gaps) ---
+# --- Other tests ---
 test-rust:
 	cargo test -p imperium-core --lib
 	cargo test -p imperium-store
@@ -45,9 +43,6 @@ test-rust:
 test-python:
 	cd python && uv run pytest -xvs
 
-test-frontend:
-	cd frontend && pnpm test
-
 # --- Lint/Format ---
 fmt-rust:
 	cargo fmt -p imperium-core -p imperium-store -p imperium-cli
@@ -55,17 +50,11 @@ fmt-rust:
 fmt-python:
 	cd python && uv run ruff format . && uv run ruff check --fix .
 
-fmt-frontend:
-	cd frontend && pnpm format
-
 lint-rust:
 	cargo clippy -p imperium-core -p imperium-store -p imperium-cli --all-targets -- -D warnings
 
 lint-python:
 	cd python && uv run ruff check . && uv run mypy .
-
-lint-frontend:
-	cd frontend && pnpm lint
 
 # --- Run ---
 run-cli:
@@ -78,5 +67,5 @@ dev-shell:
 # --- Clean ---
 clean:
 	cargo clean
-	rm -rf python/.venv frontend/node_modules frontend/dist .imperium
+	rm -rf python/.venv .imperium
 	rm -f requirements.txt

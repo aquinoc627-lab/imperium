@@ -17,7 +17,7 @@ pub struct EventId(pub ulid::Ulid);
 
 impl EventId {
     pub fn new() -> Self {
-        Self(ulid::Ulid::new())
+        Self(ulid::Ulid::generate())
     }
 }
 
@@ -381,7 +381,7 @@ pub struct Actor {
     pub id: ActorId,
     pub kind: ActorKind,
     pub name: String,
-    pub metadata: HashMap<String, String>,
+    pub metadata: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

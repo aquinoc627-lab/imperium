@@ -18,6 +18,15 @@ import {
 
 const SUBJECT = "workbench-user";
 
+function normalizeTranscript(raw) {
+  return String(raw || "").trim().replace(/\s+/g, " ");
+}
+
+function speechRecognitionCtor() {
+  const g = globalThis;
+  return g.SpeechRecognition || g.webkitSpeechRecognition || null;
+}
+
 const intents = new Map();
 const scratch = new Map();
 const seenNonces = new Set();
@@ -343,6 +352,8 @@ function replay(id) {
 let selected = null;
 let folded = null;
 let lastError = null;
+let listening = false;
+let recognition = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -615,6 +626,85 @@ $("btn-propose").onclick = () => {
   toast(`Proposed via ${result.proposer} — next: Simulate`);
   render();
 };
+
+
+function setMicUi(active) {
+  const btn = $("btn-mic");
+  if (!btn) return;
+  btn.textContent = active ? "Listening…" : "Hold to talk";
+  btn.classList.toggle("primary", active);
+  btn.setAttribute("aria-pressed", active ? "true" : "false");
+}
+
+function stopListening() {
+  listening = false;
+  try { recognition?.stop(); } catch (_) {}
+  recognition = null;
+  setMicUi(false);
+}
+
+function startListening() {
+  const Ctor = speechRecognitionCtor();
+  if (!Ctor) {
+    fail("Speech recognition is not available in this browser.");
+    return;
+  }
+  if (listening) {
+    stopListening();
+    return;
+  }
+  clearError();
+  const rec = new Ctor();
+  recognition = rec;
+  rec.lang = "en-US";
+  rec.interimResults = true;
+  rec.continuous = false;
+  rec.maxAlternatives = 1;
+  rec.onstart = () => { listening = true; setMicUi(true); };
+  rec.onerror = (ev) => {
+    stopListening();
+    const err = ev?.error || "speech error";
+    if (err === "not-allowed" || err === "service-not-allowed") {
+      fail("Microphone permission denied or speech service blocked.");
+    } else if (err === "no-speech") {
+      fail("No speech detected.");
+    } else if (err !== "aborted") {
+      fail(`Speech recognition: ${err}`);
+    }
+  };
+  rec.onend = () => { listening = false; setMicUi(false); recognition = null; };
+  rec.onresult = (ev) => {
+    let finalText = "";
+    let interim = "";
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const r = ev.results[i];
+      const t = r[0]?.transcript || "";
+      if (r.isFinal) finalText += t;
+      else interim += t;
+    }
+    if (finalText) {
+      $("nl").value = normalizeTranscript(finalText);
+      toast("Transcript ready — review, then Compile or Propose");
+    } else if (interim) {
+      $("nl").value = normalizeTranscript(interim);
+    }
+  };
+  try { rec.start(); }
+  catch (err) {
+    stopListening();
+    fail(err instanceof Error ? err.message : "Could not start speech recognition.");
+  }
+}
+
+$("btn-mic").onclick = () => startListening();
+{
+  const btn = $("btn-mic");
+  if (btn && !speechRecognitionCtor()) {
+    btn.disabled = true;
+    btn.title = "Speech recognition unavailable in this browser";
+  }
+}
+
 
 $("nl").addEventListener("keydown", (ev) => {
   if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) {

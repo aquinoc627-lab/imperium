@@ -344,8 +344,8 @@ mod tests {
     use super::*;
 
     fn test_server() -> McpServer {
-        let root = std::env::temp_dir().join(format!("imperium-mcp-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
+        // Unique path per call — process::id() races under cargo test parallelism.
+        let root = std::env::temp_dir().join(format!("imperium-mcp-{}", uuid::Uuid::new_v4()));
         let home = V0Home { root };
         home.init().unwrap();
         McpServer::new(home)
@@ -434,6 +434,8 @@ mod tests {
                 ),
             )
             .unwrap();
+        // High-risk would demand approve; echo auto-approves — the test documents the compile+sim path.
+        let _ = id;
     }
 
     #[test]
@@ -467,7 +469,7 @@ mod tests {
     fn unknown_method_is_a_json_rpc_error() {
         let server = test_server();
         let resp = server
-            .handle(r#"{"jsonrpc":"2.0","id":10,"method":"resources/list"}"#)
+            .handle(r#"{"jsonrpc":"2.0","id":10,"method":"not/a/real/method"}"#)
             .unwrap();
         assert_eq!(resp.pointer("/error/code").unwrap(), -32601);
     }

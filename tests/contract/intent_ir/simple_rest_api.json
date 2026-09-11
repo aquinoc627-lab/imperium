@@ -1,0 +1,72 @@
+{
+  "id": "22222222-2222-4222-8222-222222222222",
+  "name": "Create user REST API",
+  "nl_source": "Create a REST API for user management with PostgreSQL",
+  "goal": {
+    "description": "Create user REST API with CRUD operations",
+    "category": "CodeGeneration",
+    "priority": "Normal"
+  },
+  "constraints": [
+    {
+      "id": "c1",
+      "kind": "BudgetLimit",
+      "parameters": { "max_hours": 2 },
+      "severity": "Hard"
+    }
+  ],
+  "success_criteria": [
+    {
+      "id": "sc1",
+      "metric": "TestPassRate",
+      "threshold": {
+        "operator": "GreaterThanOrEqual",
+        "value": 0.95,
+        "unit": "ratio"
+      },
+      "weight": 1.0
+    }
+  ],
+  "tasks": [
+    {
+      "id": "10000000-0000-4000-8000-000000000001",
+      "name": "Design schema",
+      "description": "Design the user table",
+      "kind": "Design",
+      "capabilities": ["postgres"],
+      "dependencies": []
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000002",
+      "name": "Generate models",
+      "description": "Generate ORM models",
+      "kind": "CodeGeneration",
+      "capabilities": ["sqlalchemy"],
+      "dependencies": ["10000000-0000-4000-8000-000000000001"]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000003",
+      "name": "Generate routes",
+      "description": "Generate HTTP routes",
+      "kind": "CodeGeneration",
+      "capabilities": ["fastapi"],
+      "dependencies": ["10000000-0000-4000-8000-000000000001"]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000004",
+      "name": "Write tests",
+      "description": "Write API tests",
+      "kind": "Testing",
+      "capabilities": ["pytest"],
+      "dependencies": [
+        "10000000-0000-4000-8000-000000000002",
+        "10000000-0000-4000-8000-000000000003"
+      ]
+    }
+  ],
+  "risk_score": 0.2,
+  "requires_approval": false,
+  "version": 1,
+  "compiled_at": "2026-08-19T21:00:00Z",
+  "compiler_version": "imperium-intent-0.1.0-dev"
+}

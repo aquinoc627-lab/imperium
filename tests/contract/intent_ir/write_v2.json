@@ -1,0 +1,39 @@
+{
+  "id": "00000000-0000-0000-0000-000000000010",
+  "name": "Write scratch/notes.txt",
+  "nl_source": "Write file notes.txt with contents hello",
+  "goal": {
+    "description": "Write scratch/notes.txt",
+    "category": "Automation",
+    "priority": "Normal"
+  },
+  "constraints": [],
+  "success_criteria": [
+    {
+      "id": "sc1",
+      "metric": "TestPassRate",
+      "threshold": { "operator": "GreaterThanOrEqual", "value": 1, "unit": "ratio" },
+      "weight": 1.0
+    }
+  ],
+  "tasks": [
+    {
+      "id": "00000000-0000-0000-0000-000000000011",
+      "name": "Write",
+      "description": "hello",
+      "kind": "Custom",
+      "capabilities": ["cap.write"],
+      "dependencies": [],
+      "estimated_duration_ms": 20,
+      "target_path": "scratch/notes.txt",
+      "effects": [
+        { "type": "write", "path": "scratch/notes.txt", "size_bytes": 5 }
+      ]
+    }
+  ],
+  "risk_score": 0.0,
+  "requires_approval": true,
+  "version": 2,
+  "compiled_at": "2026-01-01T00:00:00Z",
+  "compiler_version": "imperium-intent-rules-0.2.0"
+}

@@ -2,29 +2,29 @@
 name = "imperium"
 version = "0.1.0-dev"
 description = "IMPERIUM Python Components"
-readme = "README.md"
 license = {text = "BSL-1.0"}
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.8",
-    "pydantic-settings>=2.3",
+    "pydantic-settings>=2.15.0",
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "sqlalchemy>=2.0",
     "aiosqlite>=0.19",
     "redis>=5.0",
     "httpx>=0.27",
-    "openapi-pydantic>=1.24",
+    "openapi-pydantic>=0.5",
     "jinja2>=3.1",
     "pyyaml>=6.0",
-    "click>=8.1",
+    "click>=8.5.0",
     "rich>=13.7",
     "structlog>=24.1",
     "tenacity>=8.2",
     "prometheus-client>=0.26.0",
     "opentelemetry-api>=1.25",
-    "opentelemetry-sdk>=1.25",
+    "opentelemetry-sdk>=1.44.0",
     "opentelemetry-exporter-otlp>=1.25",
+    "jsonschema>=4.21",
 ]
 
 [project.optional-dependencies]
@@ -38,6 +38,7 @@ dev = [
     "pre-commit>=3.6",
     "hypothesis>=6.100",
     "faker>=25.0",
+    "jsonschema>=4.21",
 ]
 ml = [
     "torch>=2.3",
@@ -47,7 +48,7 @@ ml = [
     "numpy>=1.26",
     "pandas>=2.2",
     "doWhy>=0.11",
-    "pyro-ppl>=1.8",
+    "pyro-ppl>=1.9.1",
 ]
 sim = [
     "mesa>=3.0",
@@ -67,6 +68,20 @@ dev-dependencies = [
     "pytest>=8.1",
     "ruff>=0.4",
     "mypy>=1.10",
+    "jsonschema>=4.21",
+]
+
+[tool.setuptools]
+packages = [
+    "imperium_api",
+    "imperium_mcp",
+    "imperium_voice",
+    "imperium_memory",
+    "imperium_intent",
+    "imperium_router",
+    "imperium_synthesis",
+    "imperium_evolution",
+    "imperium_simulation",
 ]
 
 [tool.ruff]
@@ -94,6 +109,8 @@ pretty = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+pythonpath = ["."]
+testpaths = ["tests"]
 bench_min_time = 1.0
 bench_max_time = 5.0
 

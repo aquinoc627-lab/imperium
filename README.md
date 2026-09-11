@@ -1,157 +1,255 @@
 # IMPERIUM
 
-> **The Self-Synthesizing Intent Runtime**
->
 > Local. Sovereign. Absolute.
 
-IMPERIUM is an operating system for intent. You express what you want in natural language. IMPERIUM compiles it to an executable specification, simulates thousands of outcomes, shows you the future before it happens, and executes with full auditability — all locally, air-gapped, and sovereign.
+IMPERIUM is a local intent runtime. A rules compiler maps a small set of
+canonical sentences onto an Intent IR, simulates the effects, issues an HMAC
+capability token on approval, and executes under those rights.
+
+`--propose` only rewrites close synonyms onto those sentences. It is not an
+open-ended language model. The six sentences the compiler accepts are listed
+under Manual CLI.
+
+**The working product is `imperium-cli`** (canonical Rust kernel) with the
+TypeScript reference kernel in [`web/v0`](web/v0) and a zero-install browser
+slice in [`web/workbench`](web/workbench). See [`specs/STATUS.md`](specs/STATUS.md).
+
+## After clone
+
+Node 22+ and Rust stable:
+
+```bash
+just v0
+```
+
+That runs the JS kernel tests, the Rust unit/integration tests, and a CLI smoke (echo + write to scratch + path-escape deny).
+
+Without `just`:
+
+```bash
+cd web/v0 && node --experimental-strip-types --test src/*.test.ts
+cargo test -p imperium-core --lib
+cargo test -p imperium-store
+cargo test -p imperium-cli
+bash scripts/v0-smoke.sh
+```
+
+## Manual CLI
+
+```bash
+cargo run -p imperium-cli -- init
+cargo run -p imperium-cli -- intent compile --input "Echo this message: ping"
+cargo run -p imperium-cli -- intent simulate --intent-id <id>          # exact dry-run preview
+cargo run -p imperium-cli -- intent simulate --intent-id <id> --json   # preview as JSON
+cargo run -p imperium-cli -- intent approve --intent-id <id>           # re-shows the preview
+cargo run -p imperium-cli -- intent execute --intent-id <id>
+cargo run -p imperium-cli -- intent replay --intent-id <id>
+```
+
+`simulate` folds a hypothetical event stream (`dry_run: true`, never persisted)
+into an exact effects preview — e.g. `write scratch/notes.txt (5 bytes)` — and
+any path denial is reported *at simulation*, before a token can exist. Approval
+re-displays the same preview: consent is to a specific diff.
+
+Canonical intents:
+
+```
+Echo this message: ping
+Write file notes.txt with contents hello
+Read file notes.txt
+Append file log.txt with contents tail
+List files under notes_dir
+Fetch https://api.example.com
+```
+
+`Write file ../secret with contents x` is rejected. Every path is confined
+to `scratch/`; sensitive files (`*.key`, `*secret*`, `.env*`) are denied at
+the host layer for every capability. Network is deny-all. Execute without
+approve (for high-risk verbs, or after revoke) fails. Low-risk verbs
+(echo/read/list) auto-approve on execute — audited as
+`IntentApproved {auto: true}`. Grants live in `.imperium/grants.json` and
+may only ever narrow the built-in defaults (fail-closed).
+
+## The semantic firewall
+
+Write your own rules in `.imperium/policy.imp` (loaded fail-closed):
+
+```
+deny read matching scratch/notes*
+deny containing curl
+require approval append
+allow read under scratch/
+```
+
+Rules evaluate first-match-wins; every filesystem action — allowed or
+denied — records a `PolicyEvaluated` event explaining why. Inspect the
+rules and the decision chain:
+
+```bash
+cargo run -p imperium-cli -- policy lint
+cargo run -p imperium-cli -- policy explain --verb read --path scratch/notes.txt
+```
+
+## The ledger
+
+Every intent's full history is queryable. The SQLite ledger is a projection
+of the canonical records — delete it and `ledger rebuild` reproduces it.
+
+```bash
+cargo run -p imperium-cli -- search hello                 # by name/source/output
+cargo run -p imperium-cli -- show --intent-id <id>        # the full trace
+cargo run -p imperium-cli -- ledger stats                 # outcomes, caps, denials
+cargo run -p imperium-cli -- ledger rebuild               # rebuild the projection
+```
+
+Compiling the same intent a third time (any phrasing) emits a
+`FrictionDetected` event suggesting a reusable form.
+
+## Synthesis + scoped network
+
+Turn an OpenAPI spec into a registered capability manifest (deterministic
+codegen, seeded property tests):
+
+```bash
+cargo run -p imperium-cli -- capabilities add --spec spec.json --name my_api
+cargo run -p imperium-cli -- capabilities approve --name my_api
+cargo run -p imperium-cli -- capabilities list
+```
+
+`Fetch <https-url>` is the first network intent — hardened at compile time
+(https only, no IPs/localhost/ports) and **default-deny**: nothing is
+fetchable until you both declare the host in `.imperium/grants.json` and
+allowlist it in `.imperium/policy.imp`:
+
+```
+allow fetch to api.example.com
+```
+
+Every fetch is explicitly approved and audited. The model can never propose
+network access. `ALLOW_CLOUD_ROUTING` stays `false` in code.
+
+## The simulator
+
+`intent simulate --trials N` runs a seeded Monte Carlo over the intent's
+task graph — success probability from observed history (Laplace-smoothed,
+with per-task factor notes), retry-aware, reproducible per seed. The world
+model is a pure view over the event log (`world show`); nothing is stored
+outside the fold. Probabilistic simulations approve only at
+`p_success >= 0.9` (integer-exact); hard denials always pass through.
+
+```bash
+cargo run -p imperium-cli -- intent simulate --intent-id <id> --trials 1000
+cargo run -p imperium-cli -- world
+```
+
+## The evolution loop
+
+Friction gets a human-gated response, never autonomy. Intents that differ
+only in content trigger `FrictionDetected`; save the reusable form, run it
+through the full gauntlet, and prove it with shadow runs:
+
+```bash
+cargo run -p imperium-cli -- forms save <intent-id> --name my_form
+cargo run -p imperium-cli -- forms run my_form --slot "new text"     # compile + simulate
+cargo run -p imperium-cli -- intent execute --shadow --intent-id <id> # redirected + verified
+cargo run -p imperium-cli -- forms list                              # runs / verified badge
+```
+
+Shadow runs redirect destructive effects under `scratch/shadow/` and fold a
+`ShadowVerified` diff (promise vs reality) without advancing the intent.
+No auto-promotion, no LLM patching — every execution stays a human decision.
+
+## Governed tool surface (MCP)
+
+`imperium mcp` serves the kernel as Model Context Protocol tools over stdio
+(hand-rolled JSON-RPC 2.0 — no SDK): compile, simulate, execute (+shadow),
+search, stats, world, forms, policy lint/explain. **Approval is deliberately
+not a tool** — an agent can propose and simulate, but the human approves in
+the CLI.
+
+## Policy tests, impact, coverage
+
+```bash
+cargo run -p imperium-cli -- policy test                                  # PASS/FAIL .imperium/policy.tests.json
+cargo run -p imperium-cli -- policy impact --rule "deny read matching notes.txt"
+cargo run -p imperium-cli -- policy impact --rule "require approval write"
+cargo run -p imperium-cli -- policy coverage
+```
+
+`impact` reports which existing intents would flip decision if the rule were
+added (exit 1 when at least one would). Allow-rules are rejected fail-closed:
+first-match ordering makes them position-dependent — `policy explain` shows
+the live chain instead. `coverage` is a census of rules and ledger intents.
+
+## Scheduled intents (audited cron)
+
+```bash
+cargo run -p imperium-cli -- schedule add --form my_form --slot "today" --every 3600
+cargo run -p imperium-cli -- schedule list
+cargo run -p imperium-cli -- schedule tick    # one-shot; wire into cron/launchd
+cargo run -p imperium-cli -- schedule pause|resume|remove --name <name>
+```
+
+`tick` re-enters the full gauntlet for every due, enabled schedule. Low-risk
+forms execute through the audited auto-approve path; high-risk forms stop at
+the human approval gate and are **never self-approved** — `next_run_at`
+advances regardless so a pending approval cannot cause repeated firing.
+
+## Secret posture
+
+The HMAC secret that signs every capability token is configurable:
+
+```bash
+cargo run -p imperium-cli -- secret status   # backend, fingerprint, migration state
+cargo run -p imperium-cli -- secret bind     # migrate token.secret into the macOS Keychain, delete the file
+cargo run -p imperium-cli -- secret rotate   # fresh 256-bit secret; issued tokens stop verifying
+```
+
+Default is the legacy file backend; the keychain is opt-in (env var
+`IMPERIUM_SECRET_BACKEND` or the marker `bind` writes). Status honestly
+labels the keychain **OS-bound, not TPM-sealed** — TPM sealing is a separate
+named spec.
+
+## Status
+
+| Area | Status |
+|------|--------|
+| v0 loop (`imperium-core` + `imperium-cli`, TS reference in `web/v0`) | **Working** — `just v0` |
+| Shared contract fixtures (TS + Rust) | **Working** — `tests/contract/v0_kernel.json` |
+| Intent IR types (Rust + Python) | Usable — shared schema + fixtures; IR v2 effects |
+| Rules compiler / tokens / dry-run preview / replay | **Working** — canonical in `imperium-core::v0` |
+| Capability breadth (read/append/list, sensitive firewall, risk-by-verb, grants) | **Working** — `specs/08-breadth.md` |
+| Semantic firewall (`.imp` policy, lint/explain, `PolicyEvaluated` audit) | **Working** — `specs/09-policy.md` |
+| Ledger (SQLite projection, search/show/stats/rebuild, friction signal) | **Working** — `specs/10-ledger.md` |
+| Synthesis + scoped network (`cap.http`, OpenAPI manifests, property tests) | **Working** — `specs/11-synthesis.md` |
+| Simulator (seeded Monte Carlo, world facts view, probabilistic gate) | **Working** — `specs/12-simulation.md` |
+| Evolution loop (slot-aware friction, forms, shadow verification) | **Working** — `specs/13-evolution.md` |
+| MCP tool surface (stdio JSON-RPC, approval-free tool list) | **Working** — `specs/14-mcp.md` |
+| Diff preview + policy test harness | **Working** — `specs/15-preview-tests.md` |
+| Scheduled intents (audited cron, no self-approval) | **Working** — `specs/16-schedules.md` |
+| Policy impact + coverage analysis | **Working** — `specs/17-policy-impact.md` |
+| Secret binding (keychain opt-in, rotation, 256-bit secrets) | **Working** — `specs/18-secret-binding.md` |
+| WASM guest | **Working** in `web/v0` (echo/write/read/append/list host imports); CLI uses the same host rules |
+| Daemon and unused crates | Scaffold (not workspace members); mock workbench removed |
+| Air-gap, SLSA, TPM sealing, Sigstore | Targets, not implemented |
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            IMPERIUM RUNTIME                                  │
-├──────────────────┬──────────────────┬──────────────────┬────────────────────┤
-│  INTENT          │  CAPABILITY      │  SIMULATION      │  EVOLUTION         │
-│  COMPILER        │  SYNTHESIZER     │  ENGINE          │  LOOP              │
-├──────────────────┼──────────────────┼──────────────────┼────────────────────┤
-│  • NL → IR       │  • Registry      │  • Causal World  │  • Friction        │
-│  • Goal          │    lookup        │    Model         │    Detection       │
-│  Decomposition   │  • API           │  • Monte Carlo   │  • Autonomous      │
-│  • Dependency    │    Discovery     │    Rollouts      │    Patch Gen       │
-│  Graph           │  • Code Gen      │  • Counterfactual│  • Shadow Deploy   │
-│  • Policy Check  │  • Sandbox       │    Queries       │  • A/B Validation  │
-│  • Risk Score    │  • Verification  │  • Diff Preview  │  • Auto-Promote    │
-└──────────────────┴──────────────────┴──────────────────┴────────────────────┘
+NL → propose? → rules IR → simulate → approve (token) → execute → fold events
 ```
 
-## Quick Start
-
-### Prerequisites
-
-- [Nix](https://nixos.org/download.html) with flakes enabled
-- Or manually: Rust 1.78+, Python 3.12+, Node 20+, pnpm 9+
-
-### Development
-
-```bash
-# Clone and enter
-git clone https://github.com/yourorg/imperium
-cd imperium
-
-# Enter hermetic dev shell (all tools provided)
-nix develop
-
-# Or use just directly
-just check          # fmt + lint + test (CI gate)
-just build-all      # Build all workspaces
-just test-all       # Run all tests
-just run-daemon     # Start daemon
-just run-cli        # Run CLI
-```
-
-### First Run
-
-```bash
-# Initialize (downloads models, sets up vault, calibrates voice)
-imperium init
-
-# Try an intent
-imperium intent new "Create a REST API for user management with PostgreSQL" --interactive
-
-# Simulate before executing
-imperium intent simulate <intent-id> --rollouts=10000
-
-# Execute with approval
-imperium intent approve <intent-id>
-imperium intent execute <intent-id>
-```
-
-## Workspaces
-
-| Workspace | Language | Purpose |
-|-----------|----------|---------|
-| `crates/imperium-core` | Rust | Core types: Intent IR, Events, Capabilities, Policy, Crypto |
-| `crates/imperium-runtime` | Rust | WASM host, capability manager, sandbox |
-| `crates/imperium-store` | Rust | SQLite event store, projections, snapshots |
-| `crates/imperium-sync` | Rust | libp2p/WebRTC sync, CRDT integration |
-| `crates/imperium-policy` | Rust | OPA/Rego embedding, policy evaluation |
-| `crates/imperium-cli` | Rust | CLI binary |
-| `crates/imperium-daemon` | Rust | Background daemon (gRPC + HTTP) |
-| `crates/imperium-voice` | Rust | Porcupine/Kokoro WASM bridge |
-| `crates/imperium-crypto` | Rust | Signing, encryption, key management |
-| `crates/imperium-ffi` | Rust | C/FFI interface for Python/Node |
-| `python/imperium_intent` | Python | Intent compiler (NL → IR) |
-| `python/imperium_simulation` | Python | Monte Carlo, causal world model |
-| `python/imperium_synthesis` | Python | Capability synthesizer (OpenAPI → WASM) |
-| `python/imperium_evolution` | Python | Friction detection, patch gen, shadow deploy |
-| `python/imperium_api` | Python | FastAPI server, OpenAPI spec |
-| `frontend/workbench` | TypeScript | React workbench (Intent Composer, Simulation Preview, World Model) |
-
-## Key Concepts
-
-### Intent IR
-The executable intermediate representation. Compiled from natural language, validated, versioned, signed.
-
-```json
-{
-  "id": "01HXK3JQ9V...",
-  "name": "Migrate auth to passkeys",
-  "goal": { "description": "Migrate auth to passkeys, zero downtime" },
-  "constraints": [{ "kind": "ZeroDowntime", "severity": "Hard" }],
-  "success_criteria": [{ "metric": "TestPassRate", "threshold": { "operator": "GreaterThanOrEqual", "value": 0.99 } }],
-  "tasks": [...],
-  "risk_score": 0.7,
-  "requires_approval": true
-}
-```
-
-### Capability
-A WASM component with declared permissions. Synthesized on-demand from API specs.
-
-```json
-{
-  "name": "github-integration",
-  "capabilities": {
-    "network": ["api.github.com:443"],
-    "vault": ["read:notes", "write:notes:project-*"],
-    "shell": ["git", "gh"],
-    "secrets": ["GITHUB_TOKEN"]
-  }
-}
-```
-
-### Simulation
-Monte Carlo rollouts on a causal world model. Answers "what if" before you commit.
-
-```
-✅ Success: 94.2%
-⚠️  Risk: 5.8% chance of 5-min DB lock
-💰 Cost: $147/mo
-⏱️  Timeline: 4.2 hrs median
-🔄 Rollback: <30s (tested in 99.8% of sims)
-```
-
-### Evolution Loop
-The system improves itself while you sleep. Detects friction → generates patches → shadow deploys → validates → promotes.
-
-## Security
-
-- **Air-gapped by default**: `ALLOW_CLOUD_ROUTING=false` enforced in code
-- **Capability-based security**: WASM components with unforgeable tokens
-- **Supply chain**: Sigstore signing, Rekor transparency log, SLSA Level 3 builds
-- **Attestation**: TPM-backed measured boot, IMA/EVM runtime integrity
-- **Privacy**: Zero-trust PII redaction proxy, local-first everything
+See `specs/00-architecture.md`, `specs/01-intent-ir.md`, `specs/v0-slice.md`. Specs `02`–`04` are ahead of the code — do not implement them yet.
 
 ## License
 
 Business Source License 1.1 (BSL-1.1) — converts to Apache-2.0 after 4 years.
 
-See [LICENSE](LICENSE) for details.
+See [LICENSE](LICENSE).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md). New work must keep `just v0` green and must not add unused crates.
 
 ---
 

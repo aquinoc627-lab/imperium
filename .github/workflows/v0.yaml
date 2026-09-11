@@ -1,0 +1,57 @@
+name: v0 slice
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "web/v0/**"
+      - "crates/imperium-core/**"
+      - "crates/imperium-cli/**"
+      - "crates/imperium-store/**"
+      - "tests/contract/**"
+      - "schemas/**"
+      - "scripts/v0-smoke.sh"
+      - "Cargo.toml"
+      - "justfile"
+      - ".github/workflows/v0.yaml"
+  pull_request:
+    branches: [master, main]
+    paths:
+      - "web/v0/**"
+      - "crates/imperium-core/**"
+      - "crates/imperium-cli/**"
+      - "crates/imperium-store/**"
+      - "tests/contract/**"
+      - "schemas/**"
+      - "scripts/v0-smoke.sh"
+      - "Cargo.toml"
+      - "justfile"
+      - ".github/workflows/v0.yaml"
+  workflow_dispatch:
+
+jobs:
+  js:
+    name: v0 js
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --experimental-strip-types --test src/*.test.ts
+        working-directory: web/v0
+
+  rust:
+    name: v0 rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy -p imperium-core -p imperium-store -p imperium-cli --all-targets -- -D warnings
+      - run: cargo test -p imperium-core --lib
+      - run: cargo test -p imperium-store
+      - run: cargo test -p imperium-cli
+      - run: bash scripts/v0-smoke.sh

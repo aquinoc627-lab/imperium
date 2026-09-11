@@ -223,6 +223,24 @@ function factorNote(cap: string, stat: CapabilityStat): string {
     : `P(${cap}) = ${rate.toFixed(4)} (prior, n=${stat.samples})`;
 }
 
+function durationFactorNote(
+  cap: string,
+  stat: CapabilityStat,
+  estimateMs: number,
+): string {
+  if (stat.durations_ms.length >= MIN_DURATION_SAMPLES) {
+    const d = [...stat.durations_ms].sort((a, b) => a - b);
+    const n = d.length;
+    const i50 = Math.min(Math.floor((n * 50) / 100), n - 1);
+    return `D(${cap}) = p50=${d[i50]}ms (n=${n})`;
+  }
+  return `D(${cap}) = estimate ${estimateMs}ms (prior, n=${stat.durations_ms.length})`;
+}
+
+function retryFactorNote(cap: string, maxAttempts: number): string {
+  return `retry(${cap}) max_attempts=${maxAttempts}`;
+}
+
 const EMPTY_STAT: CapabilityStat = { samples: 0, successes: 0, durations_ms: [] };
 
 export interface McOptions {
@@ -258,7 +276,17 @@ export function dryRunMonteCarlo(
   const factors: string[] = [];
   for (const task of ir.tasks) {
     const cap = task.capabilities[0] ?? "";
-    factors.push(factorNote(cap, mc.stats[cap] ?? EMPTY_STAT));
+    const stat = mc.stats[cap] ?? EMPTY_STAT;
+    const estimate = task.estimated_duration_ms ?? 1000;
+    const rp = task.retry_policy ?? {
+      max_attempts: 3,
+      backoff_ms: 1000,
+      backoff_multiplier: 2.0,
+    };
+    const attempts = Math.max(1, rp.max_attempts ?? 3);
+    factors.push(factorNote(cap, stat));
+    factors.push(durationFactorNote(cap, stat, estimate));
+    factors.push(retryFactorNote(cap, attempts));
   }
   for (let t = 0; t < mc.trials; t++) {
     let trialOk = true;

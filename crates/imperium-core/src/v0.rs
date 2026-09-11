@@ -1236,6 +1236,26 @@ fn factor_note(cap: &str, stat: &CapabilityStat) -> String {
     }
 }
 
+/// Observed duration p50 when enough samples exist; otherwise the task estimate.
+fn duration_factor_note(cap: &str, stat: &CapabilityStat, estimate_ms: u64) -> String {
+    if stat.durations_ms.len() >= MIN_DURATION_SAMPLES {
+        let mut d = stat.durations_ms.clone();
+        d.sort_unstable();
+        let n = d.len();
+        let i50 = ((n * 50) / 100).min(n - 1);
+        format!("D({cap}) = p50={}ms (n={n})", d[i50])
+    } else {
+        format!(
+            "D({cap}) = estimate {estimate_ms}ms (prior, n={})",
+            stat.durations_ms.len()
+        )
+    }
+}
+
+fn retry_factor_note(cap: &str, max_attempts: u32) -> String {
+    format!("retry({cap}) max_attempts={max_attempts}")
+}
+
 /// Probabilistic dry-run: hard denials pass through unchanged (p stays 0,
 /// `probabilistic` stays false); otherwise roll the task graph `trials`
 /// times with the seeded LCG.
@@ -1263,7 +1283,11 @@ pub fn dry_run_monte_carlo(
     for task in &ir.tasks {
         let cap = task.capabilities.first().cloned().unwrap_or_default();
         let stat = stats.and_then(|s| s.get(&cap)).cloned().unwrap_or_default();
+        let estimate = task.estimated_duration_ms.unwrap_or(1000);
         factors.push(factor_note(&cap, &stat));
+        factors.push(duration_factor_note(&cap, &stat, estimate));
+        let attempts = task.retry_policy.max_attempts.max(1);
+        factors.push(retry_factor_note(&cap, attempts));
     }
     for _ in 0..trials {
         let mut trial_ok = true;
@@ -1703,7 +1727,14 @@ mod tests {
             },
         );
         let sim = dry_run_monte_carlo(&ir, None, Some(&stats), 1000, 5);
-        assert_eq!(sim.factors, vec!["P(cap.write) = 0.9091 (n=9)".to_string()]);
+        assert_eq!(
+            sim.factors,
+            vec![
+                "P(cap.write) = 0.9091 (n=9)".to_string(),
+                "D(cap.write) = p50=50ms (n=9)".to_string(),
+                "retry(cap.write) max_attempts=3".to_string(),
+            ]
+        );
         assert!(sim.p50_ms >= 40 && sim.p50_ms <= 60, "p50={}", sim.p50_ms);
         assert!(sim.p95_ms >= 80, "p95={}", sim.p95_ms);
         // Small history → prior note.
@@ -1719,7 +1750,11 @@ mod tests {
         let sim = dry_run_monte_carlo(&ir, None, Some(&small), 100, 5);
         assert_eq!(
             sim.factors,
-            vec!["P(cap.write) = 0.7500 (prior, n=2)".to_string()]
+            vec![
+                "P(cap.write) = 0.7500 (prior, n=2)".to_string(),
+                "D(cap.write) = estimate 20ms (prior, n=0)".to_string(),
+                "retry(cap.write) max_attempts=3".to_string(),
+            ]
         );
     }
 

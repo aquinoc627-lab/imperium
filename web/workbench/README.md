@@ -16,6 +16,14 @@ Do not add compiler, token, or WASM logic to `app.js`.
 node scripts/emit-workbench-kernel.mjs
 ```
 
+## Voice input (Phase 19)
+
+**Hold to talk** uses the browser SpeechRecognition API to fill the sentence
+box. You still press Compile or Propose. Voice never executes intents.
+
+Honesty: browser STT may send audio to the browser vendor. This is not
+air-gapped speech.
+
 ## What this screen runs
 
 - Compile / propose / simulate / approve / execute / replay / revoke

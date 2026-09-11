@@ -15,23 +15,23 @@ export {
   READ_CAPABILITY,
   APPEND_CAPABILITY,
   LIST_CAPABILITY,
-  FETCH_CAPABILITY,
-  type CompileOk,
-  type CompileErr,
-  type CompileResult,
-  type IntentIR,
-  type Capability,
-  type Risk,
-} from "./compile_rules";
-
+  HTTP_CAPABILITY,
+  FETCH_NO_ALLOW_RULE,
+} from "./compiler.ts";
+export { localPropose } from "./propose.ts";
+export { simulateStatic } from "./simulate.ts";
 export {
-  localPropose,
-  type ProposeResult,
-} from "./local_propose";
-
+  issueToken,
+  verifyToken,
+  fingerprint,
+  grantForCapability,
+} from "./token.ts";
+export { foldEvents } from "./replay.ts";
 export {
-  parsePolicy,
-  evaluatePolicy,
-  type Policy,
-  type PolicyDecision,
-} from "./policy";
+  parsePolicyLenient,
+  lintPolicy,
+  evaluate,
+} from "./policy.ts";
+export { runGuest, rightsFromToken } from "./wasm-host.ts";
+export type { Policy } from "./policy.ts";
+export type { IntentIR, SimulationResult, EffectPreview } from "./types.ts";

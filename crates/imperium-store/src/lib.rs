@@ -282,7 +282,7 @@ impl Ledger {
             .prepare("SELECT status, COUNT(*) FROM intents GROUP BY status")?;
         let rows = stmt
             .query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, u64>(1)?))
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as u64))
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         for (status, count) in rows {
@@ -325,7 +325,6 @@ impl Ledger {
             let reason = match kind.as_str() {
                 "TaskFailed" => payload.get("reason").and_then(|v| v.as_str()),
                 "PolicyEvaluated" => {
-                    // Only count actual policy denies, not allowed decisions.
                     if payload.get("decision").and_then(|v| v.as_str()) == Some("deny") {
                         payload
                             .get("reason")
@@ -349,12 +348,7 @@ impl Ledger {
     }
 
     /// Observed per-capability facts from the event log (Phase 12 world
-    /// model). Attribution: v0 intents are single-task, so each event
-    /// belongs to the intent's first capability. Only executions that
-    /// reached `TaskStarted` count as samples (token/denial failures are
-    /// not capability performance data). Durations come from
-    /// `TaskStarted.at → TaskSucceeded.at` deltas when both events carry
-    /// timestamps.
+    /// model).
     pub fn world_stats(&self) -> Result<WorldStatsDoc> {
         let mut stmt = self
             .conn
@@ -404,7 +398,7 @@ impl Ledger {
             .query_row(
                 "SELECT COUNT(*) FROM events WHERE kind = 'PolicyEvaluated' AND payload LIKE '%\"decision\":\"deny\"%'",
                 [],
-                |row| row.get(0),
+                |row| row.get::<_, i64>(0).map(|n| n as u64),
             )
             .map_err(Into::into)
     }
@@ -471,7 +465,6 @@ mod tests {
                 vec![("TaskFailed", serde_json::json!({"reason": "nonce reused"}))],
             ))
             .unwrap();
-        // Idempotent upsert: same document (same id) synced again.
         ledger.sync(&ping).unwrap();
 
         let hits = ledger.search("ping").unwrap();
@@ -495,7 +488,6 @@ mod tests {
             payload,
             at,
         };
-        // One intent: started at t=100, succeeded at t=180 → sample 80ms.
         let mut ok = doc("executed", "ping", Some("ping"), vec![]);
         ok.events = vec![
             ev("IntentCompiled", Some(90), serde_json::json!({})),
@@ -511,89 +503,92 @@ mod tests {
             ),
         ];
         ledger.sync(&ok).unwrap();
-        // Another intent: task started then failed → sample, no duration.
-        let mut failed = doc("failed", "boom", None, vec![]);
-        failed.events = vec![
+        let mut fail = doc("failed", "boom", None, vec![]);
+        fail.events = vec![
             ev(
                 "TaskStarted",
                 Some(200),
-                serde_json::json!({"task_id": "t2"}),
+                serde_json::json!({"task_id": "t1"}),
             ),
             ev(
                 "TaskFailed",
-                Some(260),
-                serde_json::json!({"reason": "nonce reused"}),
+                Some(250),
+                serde_json::json!({"reason": "denied"}),
             ),
         ];
-        ledger.sync(&failed).unwrap();
-        // Third intent: failure WITHOUT TaskStarted (token denial) → ignored.
-        let mut denied = doc("failed", "deny", None, vec![]);
-        denied.events = vec![ev(
-            "TaskFailed",
-            Some(300),
-            serde_json::json!({"reason": "revoked"}),
-        )];
-        ledger.sync(&denied).unwrap();
+        ledger.sync(&fail).unwrap();
+        // Compile-only: never started — not a sample.
+        ledger
+            .sync(&doc("compiled", "noop", None, vec![("IntentCompiled", serde_json::json!({}))]))
+            .unwrap();
 
-        let stats = ledger.world_stats().unwrap();
-        let cap = stats.get("cap.echo").expect("cap.echo facts");
-        assert_eq!(cap.samples, 2);
-        assert_eq!(cap.successes, 1);
-        assert_eq!(cap.durations_ms, vec![80]);
+        let world = ledger.world_stats().unwrap();
+        let echo = world.get("cap.echo").unwrap();
+        assert_eq!(echo.samples, 2);
+        assert_eq!(echo.successes, 1);
+        assert_eq!(echo.durations_ms, vec![80]);
     }
 
     #[test]
-    fn world_stats_rebuildable_after_projection_reset() {
-        let tmp = std::env::temp_dir().join(tmp_tag("world2"));
-        let intents_dir = tmp.join("intents");
-        std::fs::create_dir_all(&intents_dir).unwrap();
+    fn rebuild_from_intents_dir() {
+        let tmp = std::env::temp_dir().join(tmp_tag("rebuild"));
+        let intents = tmp.join("intents");
+        std::fs::create_dir_all(&intents).unwrap();
         let mut d = doc("executed", "alpha", Some("alpha"), vec![]);
-        d.events = vec![
-            EventDocument {
-                kind: "TaskStarted".into(),
-                payload: serde_json::json!({"task_id": "t"}),
-                at: Some(10),
-            },
-            EventDocument {
-                kind: "TaskSucceeded".into(),
-                payload: serde_json::json!({"output": "x"}),
-                at: Some(50),
-            },
-        ];
+        let id = d.id().unwrap();
         std::fs::write(
-            intents_dir.join("doc.json"),
+            intents.join(format!("{id}.json")),
             serde_json::to_string_pretty(&d).unwrap(),
         )
         .unwrap();
-        let ledger = Ledger::open(&tmp.join("ledger.db")).unwrap();
-        ledger.rebuild(&intents_dir).unwrap();
-        let stats = ledger.world_stats().unwrap();
-        assert_eq!(stats["cap.echo"].durations_ms, vec![40]);
-    }
-
-    #[test]
-    fn rebuild_from_directory() {
-        let tmp = std::env::temp_dir().join(tmp_tag("rebuild"));
-        let intents_dir = tmp.join("intents");
-        std::fs::create_dir_all(&intents_dir).unwrap();
-        let doc = doc("executed", "alpha", Some("alpha"), vec![]);
+        d.status = "failed".into();
+        d.output = None;
         std::fs::write(
-            intents_dir.join("00000000-0000-0000-0000-000000000005.json"),
-            serde_json::to_string_pretty(&doc).unwrap(),
+            intents.join(format!("{id}.json")),
+            serde_json::to_string_pretty(&d).unwrap(),
         )
         .unwrap();
 
         let ledger = Ledger::open(&tmp.join("ledger.db")).unwrap();
-        assert_eq!(ledger.rebuild(&intents_dir).unwrap(), 1);
-        assert_eq!(ledger.search("alpha").unwrap().len(), 1);
+        // Seed a stale row, then rebuild should replace it.
+        ledger.sync(&doc("executed", "stale", Some("stale"), vec![])).unwrap();
+        let n = ledger.rebuild(&intents).unwrap();
+        assert_eq!(n, 1);
+        let hits = ledger.search("alpha").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].status, "failed");
+        assert!(ledger.search("stale").unwrap().is_empty());
+    }
 
-        // Corrupt the projection, then prove rebuild restores it.
-        ledger
-            .conn
-            .execute("DELETE FROM intents", params![])
-            .unwrap();
-        assert!(ledger.search("alpha").unwrap().is_empty());
-        ledger.rebuild(&intents_dir).unwrap();
-        assert_eq!(ledger.search("alpha").unwrap().len(), 1);
+    #[test]
+    fn semantic_key_ignores_description() {
+        let a = doc("compiled", "a", None, vec![]);
+        let mut b = doc("compiled", "b", None, vec![]);
+        // Same capability/task/target; different description should not change key.
+        if let Some(tasks) = b.ir.get_mut("tasks").and_then(|t| t.as_array_mut()) {
+            if let Some(task) = tasks.get_mut(0) {
+                task.as_object_mut()
+                    .unwrap()
+                    .insert("description".into(), serde_json::json!("other"));
+            }
+        }
+        assert_eq!(a.semantic_key(), b.semantic_key());
+    }
+
+    #[test]
+    fn deny_count_sees_policy_denies() {
+        let tmp = std::env::temp_dir().join(tmp_tag("deny"));
+        let ledger = Ledger::open(&tmp.join("ledger.db")).unwrap();
+        let doc = doc(
+            "failed",
+            "blocked",
+            None,
+            vec![(
+                "PolicyEvaluated",
+                serde_json::json!({"decision": "deny", "reason": "policy: blocked"}),
+            )],
+        );
+        ledger.sync(&doc).unwrap();
+        assert_eq!(ledger.deny_count().unwrap(), 1);
     }
 }

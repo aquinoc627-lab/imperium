@@ -3,21 +3,21 @@
 //! Append-only event store with causal ordering.
 //! Every state change in IMPERIUM is an event.
 
-use crate::intent::{IntentId, TaskId};
-use crate::crypto::Hash;
 use crate::capability::CapabilityId;
+use crate::crypto::Hash;
+use crate::intent::{IntentId, TaskId};
 use crate::policy::PolicyId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Unique event identifier (ULID for time-ordered uniqueness)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EventId(pub ulid::Ulid);
 
 impl EventId {
     pub fn new() -> Self {
-        Self(ulid::Ulid::new())
+        Self(ulid::Ulid::generate())
     }
 }
 
@@ -34,7 +34,7 @@ impl std::fmt::Display for EventId {
 }
 
 /// Event envelope with metadata
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {
     /// Unique event ID
     pub id: EventId,
@@ -85,13 +85,13 @@ impl Event {
     }
 
     pub fn compute_hash(&mut self) {
-        let payload_bytes = postcard::to_stdvec(&self.payload).expect("payload serializable");
+        let payload_bytes = postcard::to_allocvec(&self.payload).expect("payload serializable");
         self.payload_hash = Some(Hash::blake3(&payload_bytes));
     }
 
     pub fn verify(&self) -> bool {
         if let Some(hash) = &self.payload_hash {
-            let payload_bytes = postcard::to_stdvec(&self.payload).expect("payload serializable");
+            let payload_bytes = postcard::to_allocvec(&self.payload).expect("payload serializable");
             *hash == Hash::blake3(&payload_bytes)
         } else {
             false
@@ -100,7 +100,7 @@ impl Event {
 }
 
 /// Event type for routing and filtering
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EventType {
     // Intent lifecycle
     IntentCreated,
@@ -167,66 +167,216 @@ pub enum EventType {
 }
 
 /// Event payloads (discriminated union)
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum EventPayload {
-    IntentCreated { intent_id: IntentId, name: String, nl_source: String },
-    IntentCompiled { intent_id: IntentId, ir_hash: Hash },
-    IntentValidated { intent_id: IntentId, valid: bool, errors: Vec<String> },
-    IntentApproved { intent_id: IntentId, approver: Actor },
-    IntentRejected { intent_id: IntentId, reason: String },
-    IntentExecuted { intent_id: IntentId, branch: String },
-    IntentCompleted { intent_id: IntentId, duration_ms: u64 },
-    IntentFailed { intent_id: IntentId, error: String, failed_task: Option<TaskId> },
-    IntentRolledBack { intent_id: IntentId, reason: String, completed_tasks: Vec<TaskId> },
+    IntentCreated {
+        intent_id: IntentId,
+        name: String,
+        nl_source: String,
+    },
+    IntentCompiled {
+        intent_id: IntentId,
+        ir_hash: Hash,
+    },
+    IntentValidated {
+        intent_id: IntentId,
+        valid: bool,
+        errors: Vec<String>,
+    },
+    IntentApproved {
+        intent_id: IntentId,
+        approver: Actor,
+    },
+    IntentRejected {
+        intent_id: IntentId,
+        reason: String,
+    },
+    IntentExecuted {
+        intent_id: IntentId,
+        branch: String,
+    },
+    IntentCompleted {
+        intent_id: IntentId,
+        duration_ms: u64,
+    },
+    IntentFailed {
+        intent_id: IntentId,
+        error: String,
+        failed_task: Option<TaskId>,
+    },
+    IntentRolledBack {
+        intent_id: IntentId,
+        reason: String,
+        completed_tasks: Vec<TaskId>,
+    },
 
-    TaskStarted { intent_id: IntentId, task_id: TaskId },
-    TaskCompleted { intent_id: IntentId, task_id: TaskId, outputs: serde_json::Value },
-    TaskFailed { intent_id: IntentId, task_id: TaskId, error: String, attempt: u32 },
-    TaskRetried { intent_id: IntentId, task_id: TaskId, attempt: u32 },
-    TaskCompensated { intent_id: IntentId, task_id: TaskId, compensation_type: String },
+    TaskStarted {
+        intent_id: IntentId,
+        task_id: TaskId,
+    },
+    TaskCompleted {
+        intent_id: IntentId,
+        task_id: TaskId,
+        outputs: serde_json::Value,
+    },
+    TaskFailed {
+        intent_id: IntentId,
+        task_id: TaskId,
+        error: String,
+        attempt: u32,
+    },
+    TaskRetried {
+        intent_id: IntentId,
+        task_id: TaskId,
+        attempt: u32,
+    },
+    TaskCompensated {
+        intent_id: IntentId,
+        task_id: TaskId,
+        compensation_type: String,
+    },
 
-    SimulationStarted { intent_id: IntentId, rollouts: u32 },
-    SimulationCompleted { intent_id: IntentId, success_probability: f32, duration_ms: u64 },
-    SimulationFailed { intent_id: IntentId, error: String },
-    CounterfactualQueried { intent_id: IntentId, query: String },
-    CounterfactualResolved { intent_id: IntentId, query: String, result: serde_json::Value },
+    SimulationStarted {
+        intent_id: IntentId,
+        rollouts: u32,
+    },
+    SimulationCompleted {
+        intent_id: IntentId,
+        success_probability: f32,
+        duration_ms: u64,
+    },
+    SimulationFailed {
+        intent_id: IntentId,
+        error: String,
+    },
+    CounterfactualQueried {
+        intent_id: IntentId,
+        query: String,
+    },
+    CounterfactualResolved {
+        intent_id: IntentId,
+        query: String,
+        result: serde_json::Value,
+    },
 
-    CapabilitySynthesized { capability_id: CapabilityId, spec_hash: Hash },
-    CapabilityTested { capability_id: CapabilityId, passed: bool, results: serde_json::Value },
-    CapabilityRegistered { capability_id: CapabilityId, manifest_hash: Hash },
-    CapabilityUpdated { capability_id: CapabilityId, version: String },
-    CapabilityRemoved { capability_id: CapabilityId, reason: String },
+    CapabilitySynthesized {
+        capability_id: CapabilityId,
+        spec_hash: Hash,
+    },
+    CapabilityTested {
+        capability_id: CapabilityId,
+        passed: bool,
+        results: serde_json::Value,
+    },
+    CapabilityRegistered {
+        capability_id: CapabilityId,
+        manifest_hash: Hash,
+    },
+    CapabilityUpdated {
+        capability_id: CapabilityId,
+        version: String,
+    },
+    CapabilityRemoved {
+        capability_id: CapabilityId,
+        reason: String,
+    },
 
-    FrictionDetected { pattern: String, frequency: u32, impact: f32 },
-    PatchGenerated { patch_id: Uuid, target: String, changes: serde_json::Value },
-    ShadowDeployed { patch_id: Uuid, deployment_id: Uuid },
-    PatchValidated { patch_id: Uuid, metrics: serde_json::Value },
-    PatchPromoted { patch_id: Uuid },
-    PatchDiscarded { patch_id: Uuid, reason: String },
+    FrictionDetected {
+        pattern: String,
+        frequency: u32,
+        impact: f32,
+    },
+    PatchGenerated {
+        patch_id: Uuid,
+        target: String,
+        changes: serde_json::Value,
+    },
+    ShadowDeployed {
+        patch_id: Uuid,
+        deployment_id: Uuid,
+    },
+    PatchValidated {
+        patch_id: Uuid,
+        metrics: serde_json::Value,
+    },
+    PatchPromoted {
+        patch_id: Uuid,
+    },
+    PatchDiscarded {
+        patch_id: Uuid,
+        reason: String,
+    },
 
-    WorldModelUpdated { entity: String, changes: serde_json::Value },
-    CausalLinkDiscovered { from: String, to: String, strength: f32 },
-    AnomalyDetected { metric: String, expected: f64, actual: f64, severity: String },
+    WorldModelUpdated {
+        entity: String,
+        changes: serde_json::Value,
+    },
+    CausalLinkDiscovered {
+        from: String,
+        to: String,
+        strength: f32,
+    },
+    AnomalyDetected {
+        metric: String,
+        expected: f64,
+        actual: f64,
+        severity: String,
+    },
 
-    SyncStarted { peer_id: String },
-    SyncCompleted { peer_id: String, events_synced: u32 },
-    SyncConflict { peer_id: String, event_ids: Vec<EventId> },
-    SyncResolved { peer_id: String, resolution: String },
+    SyncStarted {
+        peer_id: String,
+    },
+    SyncCompleted {
+        peer_id: String,
+        events_synced: u32,
+    },
+    SyncConflict {
+        peer_id: String,
+        event_ids: Vec<EventId>,
+    },
+    SyncResolved {
+        peer_id: String,
+        resolution: String,
+    },
 
-    PolicyLoaded { policy_id: PolicyId, version: String },
-    PolicyEvaluated { policy_id: PolicyId, decision: String, reason: String },
-    PolicyViolated { policy_id: PolicyId, violation: String },
-    PolicyUpdated { policy_id: PolicyId, version: String },
+    PolicyLoaded {
+        policy_id: PolicyId,
+        version: String,
+    },
+    PolicyEvaluated {
+        policy_id: PolicyId,
+        decision: String,
+        reason: String,
+    },
+    PolicyViolated {
+        policy_id: PolicyId,
+        violation: String,
+    },
+    PolicyUpdated {
+        policy_id: PolicyId,
+        version: String,
+    },
 
-    DaemonStarted { version: String, config_hash: Hash },
-    DaemonStopped { reason: String },
-    HealthCheck { status: String, details: serde_json::Value },
-    ErrorOccurred { error: String, context: serde_json::Value },
+    DaemonStarted {
+        version: String,
+        config_hash: Hash,
+    },
+    DaemonStopped {
+        reason: String,
+    },
+    HealthCheck {
+        status: String,
+        details: serde_json::Value,
+    },
+    ErrorOccurred {
+        error: String,
+        context: serde_json::Value,
+    },
 }
 
 /// Actor that initiates events
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Actor {
     pub id: ActorId,
     pub kind: ActorKind,
@@ -234,7 +384,7 @@ pub struct Actor {
     pub metadata: HashMap<String, String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActorKind {
     User,
     System,
@@ -248,7 +398,7 @@ pub enum ActorKind {
 }
 
 /// Actor identifier
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ActorId(pub Uuid);
 
 impl ActorId {
@@ -264,7 +414,7 @@ impl Default for ActorId {
 }
 
 /// Event stream for a specific aggregate (intent, capability, etc.)
-#[derive(Debug, Clone, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventStream {
     pub aggregate_id: String,
     pub aggregate_type: AggregateType,
@@ -273,7 +423,7 @@ pub struct EventStream {
     pub version: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, postcard::Serialize, postcard::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AggregateType {
     Intent,
     Capability,

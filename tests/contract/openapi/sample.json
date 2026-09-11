@@ -1,0 +1,13 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "Example API", "version": "1.0.0" },
+  "servers": [{ "url": "https://api.example.com" }],
+  "paths": {
+    "/v1/things": {
+      "get": { "operationId": "list_things", "summary": "List things" }
+    },
+    "/v1/things/{id}": {
+      "get": { "operationId": "get_thing", "summary": "Get one thing" }
+    }
+  }
+}

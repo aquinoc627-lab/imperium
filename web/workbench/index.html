@@ -27,6 +27,9 @@ textarea{width:100%;background:var(--panel);color:var(--fg);border:1px solid var
 button{background:transparent;color:var(--fg);border:1px solid var(--line);padding:.4rem .7rem;font:0.72rem var(--mono);letter-spacing:.04em;cursor:pointer}
 button:hover{border-color:var(--accent);color:#fff}
 button.primary{border-color:var(--accent);color:#fff}
+button:disabled{opacity:.35;cursor:not-allowed;border-color:var(--line);color:var(--subtle)}
+button:disabled:hover{border-color:var(--line);color:var(--subtle)}
+.deny[role="alert"]{margin:0 0 .7rem}
 .hint{color:var(--subtle);font:0.72rem var(--mono);margin:.4rem 0 0}
 .meter{display:flex;gap:1px;margin:0 0 1rem}
 .meter i{flex:1;height:2px;background:#19191f}
@@ -59,7 +62,7 @@ pre{margin:0;white-space:pre-wrap;word-break:break-word;font:0.72rem var(--mono)
     <h2>Source</h2>
     <label for="nl">sentence</label>
     <textarea id="nl">Echo this message: ping</textarea>
-    <p class="hint">Echo / Write / Read / Append / List / Fetch</p>
+    <p class="hint">Echo / Write / Read / Append / List / Fetch · ⌘/Ctrl+Enter compiles</p>
     <div class="row">
       <button type="button" class="primary" id="btn-compile">Compile</button>
       <button type="button" id="btn-propose">Propose</button>

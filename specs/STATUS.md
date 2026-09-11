@@ -1,4 +1,4 @@
-# Honest status (2026-09-07)
+# Honest status (2026-09-11)
 
 The v0 vertical slice is implemented in [`web/v0`](../web/v0) as the TS
 reference; the **canonical kernel is Rust** (`imperium-core::v0`). Both are
@@ -25,6 +25,7 @@ validated against the shared fixtures in `tests/contract/v0_kernel.json`.
 | 16 | Scheduled intents | Done — `specs/16-schedules.md`. High-risk forms never self-approve. |
 | 17 | Policy impact & coverage | Done — `specs/17-policy-impact.md`. Allow-rules rejected fail-closed. |
 | 18 | Secret binding | Done — `specs/18-secret-binding.md`. Keychain is OS-bound, not TPM-sealed. |
+| 19 | Voice input (workbench) | Done — `specs/19-voice-input.md`. Input-only; no TTS; browser STT may leave the device. |
 
 ## Kernel consolidation (Phase 7)
 
@@ -46,11 +47,10 @@ validated against the shared fixtures in `tests/contract/v0_kernel.json`.
 
 ## Planned
 
-Nothing drafted. The roadmap through Phase 18 is complete. Specs `02`–`04`
-retain deferred depth (causal graphs, A/B auto-promotion, LLM patching,
-P2P, voice, TPM/SLSA) that would each need a new named spec.
+Phase 19 (voice input-only, workbench) is shipped. Specs `02`–`04` retain
+deferred depth (causal graphs, A/B auto-promotion, LLM patching, P2P,
+offline/on-device STT, TPM/SLSA) that would each need a new named spec.
 
-Owner-named next candidates (spec required first): voice (input-only),
-Monte Carlo factor breadth, workbench UI on the real kernel.
+Owner-named next candidate (spec required first): Monte Carlo factor breadth.
 
 Do not add crates or UI pages until they consume `imperium-core::v0` behavior.

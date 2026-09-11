@@ -1,3 +1,1 @@
-//! File-backed v0 loop used by the CLI.
-
-use anyhow::{anyhow, bail, Context, Result};
+LOAD_FROM_/tmp/v0_cmd_for_push.txt

@@ -1152,9 +1152,10 @@ pub struct UreqTransport;
 
 impl HttpTransport for UreqTransport {
     fn get(&self, url: &str) -> Result<String> {
+        // ureq 3.x: Response is http::Response<Body>; status errors are StatusCode.
         match ureq::get(url).call() {
-            Ok(resp) => Ok(resp.into_string().unwrap_or_default()),
-            Err(ureq::Error::Status(code, _)) => {
+            Ok(mut resp) => Ok(resp.body_mut().read_to_string().unwrap_or_default()),
+            Err(ureq::Error::StatusCode(code)) => {
                 bail!("http status {code}")
             }
             Err(e) => bail!("http transport error: {e}"),

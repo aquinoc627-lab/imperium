@@ -26,6 +26,7 @@ validated against the shared fixtures in `tests/contract/v0_kernel.json`.
 | 17 | Policy impact & coverage | Done — `specs/17-policy-impact.md`. Allow-rules rejected fail-closed. |
 | 18 | Secret binding | Done — `specs/18-secret-binding.md`. Keychain is OS-bound, not TPM-sealed. |
 | 19 | Voice input (workbench) | Done — `specs/19-voice-input.md`. Input-only; no TTS; browser STT may leave the device. |
+| 20 | MC factor breadth | Done — `specs/20-mc-factor-breadth.md`. Factors gain duration + retry notes; sampling unchanged. |
 
 ## Kernel consolidation (Phase 7)
 
@@ -47,10 +48,10 @@ validated against the shared fixtures in `tests/contract/v0_kernel.json`.
 
 ## Planned
 
-Phase 19 (voice input-only, workbench) is shipped. Specs `02`–`04` retain
-deferred depth (causal graphs, A/B auto-promotion, LLM patching, P2P,
+Phases 19–20 shipped (voice input-only; MC factor breadth). Specs `02`–`04`
+retain deferred depth (causal graphs, A/B auto-promotion, LLM patching, P2P,
 offline/on-device STT, TPM/SLSA) that would each need a new named spec.
 
-Owner-named next candidate (spec required first): Monte Carlo factor breadth.
+Owner-named next candidates: none queued. Pick a new named phase before coding.
 
 Do not add crates or UI pages until they consume `imperium-core::v0` behavior.

@@ -1364,7 +1364,9 @@
         "p50_ms": 60,
         "p95_ms": 1100,
         "factors": [
-          "P(cap.write) = 0.9091 (n=9)"
+          "P(cap.write) = 0.9091 (n=9)",
+          "D(cap.write) = p50=50ms (n=9)",
+          "retry(cap.write) max_attempts=3"
         ],
         "success_probability": 1.0,
         "risk": 0.0,
@@ -1423,7 +1425,9 @@
         "p50_ms": 20,
         "p95_ms": 3060,
         "factors": [
-          "P(cap.write) = 0.5000 (prior, n=0)"
+          "P(cap.write) = 0.5000 (prior, n=0)",
+          "D(cap.write) = estimate 20ms (prior, n=0)",
+          "retry(cap.write) max_attempts=3"
         ],
         "success_probability": 1.0,
         "risk": 0.0,

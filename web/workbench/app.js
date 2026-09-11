@@ -342,16 +342,28 @@ function replay(id) {
 
 let selected = null;
 let folded = null;
+let lastError = null;
 
 const $ = (id) => document.getElementById(id);
 
-function toast(msg) {
+function toast(msg, ms = 2200) {
   const t = $("toast");
   t.hidden = false;
   t.textContent = msg;
-  setTimeout(() => {
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => {
     t.hidden = true;
-  }, 2200);
+  }, ms);
+}
+
+function fail(msg) {
+  lastError = msg;
+  toast(msg, 4500);
+  render();
+}
+
+function clearError() {
+  lastError = null;
 }
 
 function escapeHtml(s) {
@@ -419,7 +431,11 @@ function renderList() {
 function renderDetail() {
   const el = $("detail");
   if (!selected) {
-    el.innerHTML = `<p class="empty">No intent. Compile a canonical sentence.</p>`;
+    const err = lastError
+      ? `<p class="deny" role="alert">${escapeHtml(lastError)}</p>`
+      : "";
+    el.innerHTML = `${err}<p class="empty">No intent. Compile a canonical sentence (or Propose a loose one).</p>
+    <p class="hint">Try: Echo this message: ping</p>`;
     return;
   }
 
@@ -466,13 +482,14 @@ function renderDetail() {
       <dt>requires approval</dt><dd>${selected.ir.requires_approval ? "yes" : "no"}</dd>
       <dt>token</dt><dd>${escapeHtml(tokenState)}</dd>
     </dl>
-    <div class="row">
-      <button id="a-sim">Simulate</button>
-      <button id="a-appr">Approve</button>
-      <button class="primary" id="a-exec">Execute</button>
-      <button id="a-shadow">Shadow execute</button>
-      <button id="a-rev">Revoke</button>
-      <button id="a-rep">Replay log</button>
+    ${lastError ? `<p class="deny" role="alert">${escapeHtml(lastError)}</p>` : ""}
+    <div class="row" id="gauntlet-actions">
+      <button type="button" id="a-sim">Simulate</button>
+      <button type="button" id="a-appr">Approve</button>
+      <button type="button" class="primary" id="a-exec">Execute</button>
+      <button type="button" id="a-shadow">Shadow execute</button>
+      <button type="button" id="a-rev">Revoke</button>
+      <button type="button" id="a-rep">Replay log</button>
     </div>
     ${sim ? `<div class="preview">risk ${sim.risk} · success ${Math.round(sim.success_probability * 100)}% · ${sim.duration_ms}ms</div>` : "<p class=\"empty\">No simulation yet.</p>"}
     ${preview}
@@ -485,7 +502,8 @@ function renderDetail() {
 
   $("a-sim").onclick = () => {
     const r = simulate(selected.id);
-    if (!r.ok) return toast(r.error);
+    if (!r.ok) return fail(r.error);
+    clearError();
     selected = r.intent;
     toast("Simulated");
     render();
@@ -493,7 +511,8 @@ function renderDetail() {
 
   $("a-appr").onclick = async () => {
     const r = await approve(selected.id);
-    if (!r.ok) return toast(r.error);
+    if (!r.ok) return fail(r.error);
+    clearError();
     selected = r.intent;
     toast("Approved");
     render();
@@ -501,7 +520,8 @@ function renderDetail() {
 
   $("a-exec").onclick = async () => {
     const r = await execute(selected.id, false);
-    if (!r.ok) return toast(r.error);
+    if (!r.ok) return fail(r.error);
+    clearError();
     selected = r.intent;
     toast("Executed");
     render();
@@ -511,7 +531,8 @@ function renderDetail() {
     const before = selected.status;
     const usedBefore = selected.token?.used;
     const r = await execute(selected.id, true);
-    if (!r.ok) return toast(r.error);
+    if (!r.ok) return fail(r.error);
+    clearError();
     selected = r.intent;
     if (selected.status !== before || selected.token?.used !== usedBefore) {
       toast("Shadow run changed state unexpectedly");
@@ -523,7 +544,8 @@ function renderDetail() {
 
   $("a-rev").onclick = () => {
     const r = revoke(selected.id);
-    if (!r.ok) return toast(r.error);
+    if (!r.ok) return fail(r.error);
+    clearError();
     selected = r.intent;
     toast("Token revoked");
     render();
@@ -531,7 +553,8 @@ function renderDetail() {
 
   $("a-rep").onclick = () => {
     const r = replay(selected.id);
-    if (!r.ok) return toast(r.error);
+    if (!r.ok) return fail(r.error);
+    clearError();
     folded = {
       status: r.folded.status,
       matches: r.matches_store,
@@ -540,7 +563,25 @@ function renderDetail() {
     renderDetail();
     toast(r.matches_store ? "Replay matches store" : "Replay diverged");
   };
+
+  const st = selected.status;
+  const hasToken = Boolean(selected.token);
+  const canSim = st === "compiled" || st === "simulated" || st === "failed";
+  const canAppr = st === "simulated";
+  const canExec = st === "simulated" || st === "approved";
+  const canRev = hasToken && !selected.token?.revoked;
+  $("a-sim").disabled = !canSim;
+  $("a-appr").disabled = !canAppr;
+  $("a-exec").disabled = !canExec && st !== "compiled";
+  $("a-shadow").disabled = !canExec && st !== "compiled";
+  $("a-rev").disabled = !canRev;
+  $("a-sim").title = canSim ? "Dry-run effects" : "Compile first";
+  $("a-appr").title = canAppr ? "Issue HMAC token" : "Simulate first";
+  $("a-exec").title = "Run guest (auto-simulates / auto-approves low risk)";
+  $("a-shadow").title = "Execute without spending the token";
+  $("a-rev").title = canRev ? "Revoke live token" : "No live token";
 }
+
 
 function render() {
   if (selected) {
@@ -556,21 +597,30 @@ $("policy").addEventListener("input", renderPolicyLint);
 
 $("btn-compile").onclick = () => {
   const result = compile($("nl").value);
-  if (!result.ok) return toast(result.error);
+  if (!result.ok) return fail(result.error);
+  clearError();
   selected = result.intent;
   folded = null;
-  toast("Compiled");
+  toast("Compiled — next: Simulate");
   render();
 };
 
 $("btn-propose").onclick = () => {
   const result = propose($("nl").value);
-  if (!result.ok) return toast(result.error);
+  if (!result.ok) return fail(result.error);
+  clearError();
   $("nl").value = result.canonical;
   selected = result.intent;
   folded = null;
-  toast(`Proposed via ${result.proposer}`);
+  toast(`Proposed via ${result.proposer} — next: Simulate`);
   render();
 };
+
+$("nl").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) {
+    ev.preventDefault();
+    $("btn-compile").click();
+  }
+});
 
 render();

@@ -51,7 +51,7 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy -p imperium-core -p imperium-store -p imperium-cli --all-targets -- -D warnings
-      - run: cargo test -p imperium-core --lib
+      - run: cargo test -p imperium-core
       - run: cargo test -p imperium-store
       - run: cargo test -p imperium-cli
       - run: bash scripts/v0-smoke.sh

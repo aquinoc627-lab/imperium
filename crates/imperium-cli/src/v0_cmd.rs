@@ -1004,6 +1004,12 @@ impl V0Home {
                     }
                 }
                 READ_CAP => {
+                    if let Err(e) = symlink_escape_guard(&self.root, &path) {
+                        let reason = format!("host.read {e}");
+                        let e2 = fail(&mut rec, &reason);
+                        self.save(&rec)?;
+                        return Err(e2);
+                    }
                     let dest = self.root.join(&path);
                     match fs::read_to_string(&dest) {
                         Ok(contents) => contents,
@@ -1016,6 +1022,12 @@ impl V0Home {
                     }
                 }
                 LIST_CAP => {
+                    if let Err(e) = symlink_escape_guard(&self.root, &path) {
+                        let reason = format!("host.list {e}");
+                        let e2 = fail(&mut rec, &reason);
+                        self.save(&rec)?;
+                        return Err(e2);
+                    }
                     let dest = self.root.join(&path);
                     match fs::read_dir(&dest) {
                         Ok(entries) => {
@@ -1164,6 +1176,7 @@ impl HttpTransport for UreqTransport {
 }
 
 fn write_scratch(root: &Path, rel: &str, contents: &str) -> Result<()> {
+    symlink_escape_guard(root, rel)?;
     let dest = root.join(rel);
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent)?;
@@ -1173,6 +1186,7 @@ fn write_scratch(root: &Path, rel: &str, contents: &str) -> Result<()> {
 }
 
 fn append_scratch(root: &Path, rel: &str, contents: &str) -> Result<()> {
+    symlink_escape_guard(root, rel)?;
     let dest = root.join(rel);
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent)?;
@@ -1183,6 +1197,28 @@ fn append_scratch(root: &Path, rel: &str, contents: &str) -> Result<()> {
         .append(true)
         .open(dest)?;
     file.write_all(contents.as_bytes())?;
+    Ok(())
+}
+
+/// Host-layer confinement (Phase 8 hardening): path-prefix checks are
+/// string-based, so a symlink planted under `scratch/` could tunnel an
+/// effect outside it. Refuse to touch any path when an existing component
+/// is a symlink. Not an anti-race guarantee — this is a local single-user
+/// tool — but it closes the planted-link escape.
+fn symlink_escape_guard(root: &Path, rel: &str) -> Result<()> {
+    let mut current = root.to_path_buf();
+    for comp in rel.split('/').filter(|p| !p.is_empty()) {
+        current.push(comp);
+        match std::fs::symlink_metadata(&current) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                bail!("symlink escape denied: {}", current.display());
+            }
+            Ok(_) => {}
+            // Nothing below a missing component can be a symlink yet.
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => return Err(e.into()),
+        }
+    }
     Ok(())
 }
 
@@ -1228,6 +1264,48 @@ mod tests {
             .compile("Write file ../secret with contents x", false)
             .is_err());
         assert!(!home.root.join("secret").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_escape_is_denied_at_the_host_layer() {
+        let home = tmp_home();
+        fs::create_dir_all(home.root.join("scratch")).unwrap();
+        fs::create_dir_all(home.root.join("outside")).unwrap();
+        std::os::unix::fs::symlink(
+            home.root.join("outside"),
+            home.root.join("scratch/link"),
+        )
+        .unwrap();
+
+        // Write through the planted link is denied at execute.
+        let w = home
+            .compile("Write file link/data.txt with contents x", false)
+            .unwrap();
+        let id = w.ir.id.to_string();
+        home.simulate_opts(&id, None).unwrap();
+        home.approve(&id).unwrap();
+        let err = home.execute(&id).unwrap_err().to_string();
+        assert!(err.contains("symlink escape denied"), "{err}");
+        assert!(!home.root.join("outside/data.txt").exists());
+
+        // Read through the link is denied too.
+        let r = home.compile("Read file link/data.txt", false).unwrap();
+        let id = r.ir.id.to_string();
+        home.simulate_opts(&id, None).unwrap();
+        home.approve(&id).unwrap();
+        let err = home.execute(&id).unwrap_err().to_string();
+        assert!(err.contains("symlink escape denied"), "{err}");
+
+        // A plain path still works.
+        let ok = home
+            .compile("Write file plain.txt with contents y", false)
+            .unwrap();
+        let id = ok.ir.id.to_string();
+        home.simulate_opts(&id, None).unwrap();
+        home.approve(&id).unwrap();
+        let rec = home.execute(&id).unwrap();
+        assert_eq!(rec.status, IntentStatus::Executed);
     }
 
     #[test]

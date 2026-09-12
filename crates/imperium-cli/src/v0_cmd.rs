@@ -117,6 +117,13 @@ impl V0Home {
         if !path.exists() {
             return Ok(None);
         }
+        // Phase 21: oversized policy files refuse to load (fail-closed).
+        const MAX_POLICY_BYTES: u64 = 1024 * 1024;
+        let meta = fs::metadata(&path)
+            .with_context(|| format!("policy file unreadable: {}", path.display()))?;
+        if meta.len() > MAX_POLICY_BYTES {
+            bail!("policy.imp exceeds 1 MiB limit (fail-closed)");
+        }
         let data = fs::read_to_string(&path)
             .with_context(|| format!("policy file unreadable: {}", path.display()))?;
         let (policy, issues) = imp::parse_policy_lenient(&data);
@@ -1298,6 +1305,25 @@ mod tests {
         let err = home.execute(&id).unwrap_err().to_string();
         assert!(err.contains("symlink escape denied"), "{err}");
 
+        // Append through the link is denied too.
+        let a = home
+            .compile("Append file link/data.txt with contents more", false)
+            .unwrap();
+        let id = a.ir.id.to_string();
+        home.simulate_opts(&id, None).unwrap();
+        home.approve(&id).unwrap();
+        let err = home.execute(&id).unwrap_err().to_string();
+        assert!(err.contains("symlink escape denied"), "{err}");
+        assert!(!home.root.join("outside/data.txt").exists());
+
+        // List through the link is denied too.
+        let l = home.compile("List files under link", false).unwrap();
+        let id = l.ir.id.to_string();
+        home.simulate_opts(&id, None).unwrap();
+        home.approve(&id).unwrap();
+        let err = home.execute(&id).unwrap_err().to_string();
+        assert!(err.contains("symlink escape denied"), "{err}");
+
         // A plain path still works.
         let ok = home
             .compile("Write file plain.txt with contents y", false)
@@ -1947,6 +1973,17 @@ mod tests {
         let r = home.compile("Echo this message: ping", false).unwrap();
         let id = r.ir.id.to_string();
         assert!(home.simulate_opts(&id, None).is_err());
+    }
+
+    #[test]
+    fn oversized_policy_fails_closed() {
+        let home = tmp_home();
+        let big = "deny read matching scratch/x\n".repeat(70_000);
+        write_policy(&home, &big);
+        let r = home.compile("Echo this message: ping", false).unwrap();
+        let id = r.ir.id.to_string();
+        let err = home.simulate_opts(&id, None).unwrap_err().to_string();
+        assert!(err.contains("exceeds 1 MiB limit"), "{err}");
     }
 
     #[test]

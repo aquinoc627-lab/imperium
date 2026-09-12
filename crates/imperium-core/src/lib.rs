@@ -55,25 +55,44 @@ pub fn diff_preview(old: Option<&str>, new: &str) -> Vec<String> {
     let mut lines: Vec<String> = only_old
         .into_iter()
         .map(|l| format!("- {}", l))
-        .chain(
-            only_new.into_iter().map(|l| format!("+ {}", l)),
-        )
+        .chain(only_new.into_iter().map(|l| format!("+ {}", l)))
         .collect();
 
     // Sort so - lines come before + lines for stable output
     lines.sort();
 
-    let extra = old_len + new_len - 20;
-    let marker = if lines.len() > 20 && extra > 0 {
-        lines.truncate(20);
-        Some(format!("... {} more lines", extra))
+    let extra = if lines.len() > 20 {
+        Some((old_len + new_len).saturating_sub(20))
     } else {
         None
     };
+    let marker = extra.filter(|e| *e > 0).map(|e| {
+        lines.truncate(20);
+        format!("... {e} more lines")
+    });
 
     if let Some(m) = marker {
         lines.push(m);
     }
 
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn diff_preview_never_underflows() {
+        // Fewer than 20 total diff lines used to underflow (n - 20).
+        assert_eq!(
+            crate::diff_preview(Some("a\nb"), "b\nc"),
+            vec!["+ c".to_string(), "- a".to_string()]
+        );
+        // Over 20 lines: truncated with a "N more lines" marker.
+        let old: String = (0..30).map(|i| format!("old{i}\n")).collect();
+        let new: String = (0..30).map(|i| format!("new{i}\n")).collect();
+        let out = crate::diff_preview(Some(&old), &new);
+        assert_eq!(out.len(), 21);
+        assert!(out.last().unwrap().starts_with("... "));
+        assert!(out.last().unwrap().ends_with("more lines"));
+    }
 }

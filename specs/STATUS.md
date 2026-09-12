@@ -27,6 +27,7 @@ validated against the shared fixtures in `tests/contract/v0_kernel.json`.
 | 18 | Secret binding | Done — `specs/18-secret-binding.md`. Keychain is OS-bound, not TPM-sealed. |
 | 19 | Voice input (workbench) | Done — `specs/19-voice-input.md`. Input-only; no TTS; browser STT may leave the device. |
 | 20 | MC factor breadth | Done — `specs/20-mc-factor-breadth.md`. Factors gain duration + retry notes; sampling unchanged. |
+| 21 | Host-layer hardening | Done — `specs/21-host-hardening.md`. Property tests (`proptest`, dev-only) found and fixed two panics (`diff_preview` underflow, `starts_ci` byte-boundary); NL-source 64 KiB cap and 1 MiB policy cap, both kernels, pinned by fixtures. |
 
 ## Kernel consolidation (Phase 7)
 
@@ -48,9 +49,10 @@ validated against the shared fixtures in `tests/contract/v0_kernel.json`.
 
 ## Planned
 
-Phases 19–20 shipped (voice input-only; MC factor breadth). Specs `02`–`04`
-retain deferred depth (causal graphs, A/B auto-promotion, LLM patching, P2P,
-offline/on-device STT, TPM/SLSA) that would each need a new named spec.
+Phases 19–21 shipped (voice input-only; MC factor breadth; host-layer
+hardening). Specs `02`–`04` retain deferred depth (causal graphs, A/B
+auto-promotion, LLM patching, P2P, offline/on-device STT, TPM/SLSA) that
+would each need a new named spec.
 
 Owner-named next candidates: none queued. Pick a new named phase before coding.
 

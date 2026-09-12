@@ -244,12 +244,21 @@ pub fn fetch_url_host(url: &str) -> Result<String, String> {
 }
 
 fn starts_ci(s: &str, prefix: &str) -> bool {
-    s.len() >= prefix.len() && s[..prefix.len()].eq_ignore_ascii_case(prefix)
+    s.get(..prefix.len())
+        .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
 }
 
 pub const COMPILE_USAGE_ERROR: &str = "v0 rules compiler only accepts: Echo this message: <text>  OR  Write file <path> with contents <text>  OR  Read file <path>  OR  Append file <path> with contents <text>  OR  List files under <path>  OR  Fetch <https-url>";
+/// Phase 21: hard ceiling on natural-language source size (bytes), checked
+/// before trimming/parsing. Same constant + error in the TS mirror; pinned
+/// by the shared contract fixtures.
+pub const MAX_NL_SOURCE_LEN: usize = 64 * 1024;
+pub const NL_TOO_LONG_ERROR: &str = "Natural language source is too long.";
 
 pub fn compile_rules(nl: &str) -> Result<IntentIR, String> {
+    if nl.len() > MAX_NL_SOURCE_LEN {
+        return Err(NL_TOO_LONG_ERROR.into());
+    }
     let source = nl.trim();
     if source.is_empty() {
         return Err("Natural language source is empty.".into());
@@ -306,6 +315,9 @@ pub fn compile_rules(nl: &str) -> Result<IntentIR, String> {
 }
 
 pub fn local_propose(nl: &str) -> Result<(String, &'static str), String> {
+    if nl.len() > MAX_NL_SOURCE_LEN {
+        return Err(NL_TOO_LONG_ERROR.into());
+    }
     let source = nl.trim();
     if source.is_empty() {
         return Err("Natural language source is empty.".into());
@@ -1855,6 +1867,25 @@ mod tests {
         let (c, src) = local_propose("say hello").unwrap();
         assert_eq!(src, "local");
         assert_eq!(c, "Echo this message: hello");
+    }
+
+    #[test]
+    fn oversized_nl_is_rejected_with_the_canonical_error() {
+        let long = "a".repeat(MAX_NL_SOURCE_LEN + 1);
+        assert_eq!(compile_rules(&long).unwrap_err(), NL_TOO_LONG_ERROR);
+        assert_eq!(local_propose(&long).unwrap_err(), NL_TOO_LONG_ERROR);
+        // Exactly at the cap: passes the size check, fails on grammar.
+        let at_cap = "a".repeat(MAX_NL_SOURCE_LEN);
+        assert_ne!(compile_rules(&at_cap).unwrap_err(), NL_TOO_LONG_ERROR);
+    }
+
+    #[test]
+    fn compile_with_multibyte_prefix_never_panics() {
+        // The 18-byte prefix cut lands inside a multibyte char: the old
+        // byte-slice starts_ci panicked here.
+        let err = compile_rules("あああああéあecho this message: hi").unwrap_err();
+        assert_eq!(err, COMPILE_USAGE_ERROR);
+        assert!(local_propose("あああああéあecho this message: hi").is_err());
     }
 
     #[test]

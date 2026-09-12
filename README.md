@@ -229,6 +229,9 @@ named spec.
 | Scheduled intents (audited cron, no self-approval) | **Working** — `specs/16-schedules.md` |
 | Policy impact + coverage analysis | **Working** — `specs/17-policy-impact.md` |
 | Secret binding (keychain opt-in, rotation, 256-bit secrets) | **Working** — `specs/18-secret-binding.md` |
+| Voice input (workbench, input-only STT) | **Working** — `specs/19-voice-input.md` |
+| MC factor breadth (duration + retry notes) | **Working** — `specs/20-mc-factor-breadth.md` |
+| Host-layer hardening (property tests, input caps, symlink denial) | **Working** — `specs/21-host-hardening.md` |
 | WASM guest | **Working** in `web/v0` (echo/write/read/append/list host imports); CLI uses the same host rules |
 | Daemon and unused crates | Scaffold (not workspace members); mock workbench removed |
 | Air-gap, SLSA, TPM sealing, Sigstore | Targets, not implemented |

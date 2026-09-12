@@ -1,4 +1,5 @@
 import { BUILTIN_CONTENT_DENIES, BUILTIN_CONTENT_DENIED_MESSAGE } from "./policy.ts";
+import { MAX_NL_SOURCE_LEN, NL_TOO_LONG_ERROR } from "./compiler.ts";
 
 export type Proposal =
   | { ok: true; canonical: string; proposer: "rules" | "local" | "model" }
@@ -52,6 +53,9 @@ export function toCanonicalList(path: string): string {
 }
 
 export function localPropose(nl: string): Proposal {
+  if (nl.length > MAX_NL_SOURCE_LEN) {
+    return { ok: false, error: NL_TOO_LONG_ERROR, proposer: "none" };
+  }
   const source = nl.trim();
   if (!source) return { ok: false, error: "Natural language source is empty.", proposer: "none" };
   if (contentDenied(source)) {

@@ -29,6 +29,11 @@ export const IR_VERSION = 2 as const;
 export const APPROVAL_THRESHOLD = 0.4;
 export const COMPILE_USAGE_ERROR =
   "v0 rules compiler only accepts: Echo this message: <text>  OR  Write file <path> with contents <text>  OR  Read file <path>  OR  Append file <path> with contents <text>  OR  List files under <path>  OR  Fetch <https-url>";
+// Phase 21: hard ceiling on natural-language source size, checked before
+// trimming/parsing. Mirrors MAX_NL_SOURCE_LEN in v0.rs (bytes vs UTF-16
+// units; the shared fixtures pin ASCII cases where both agree).
+export const MAX_NL_SOURCE_LEN = 64 * 1024;
+export const NL_TOO_LONG_ERROR = "Natural language source is too long.";
 
 /** Risk weight per verb (Phase 8): drives requires_approval. Unknown = 1. */
 export function riskForCapability(capability: string): number {
@@ -124,6 +129,9 @@ function baseIr(
 export function compileRules(nl: string):
   | { ok: true; ir: IntentIR }
   | { ok: false; error: string } {
+  if (nl.length > MAX_NL_SOURCE_LEN) {
+    return { ok: false, error: NL_TOO_LONG_ERROR };
+  }
   const source = nl.trim();
   if (!source) {
     return { ok: false, error: "Natural language source is empty." };

@@ -1605,6 +1605,63 @@
         "risk": 1.0,
         "duration_ms": 20
       }
+    },
+    {
+      "name": "mc_zero_trials",
+      "ir": {
+        "id": "00000000-0000-0000-0000-0000000000f1",
+        "name": "Write scratch/notes.txt",
+        "nl_source": "Write file notes.txt with contents hi",
+        "goal": {
+          "description": "Write scratch/notes.txt",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [],
+        "tasks": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000f2",
+            "name": "Write",
+            "description": "hi",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.write"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 20,
+            "target_path": "scratch/notes.txt",
+            "effects": [
+              {
+                "type": "write",
+                "path": "scratch/notes.txt",
+                "size_bytes": 2
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.5,
+        "requires_approval": true,
+        "version": 2,
+        "compiled_at": "2026-01-01T00:00:00Z",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      },
+      "stats": {},
+      "trials": 0,
+      "seed": 0,
+      "expected": {
+        "probabilistic": false,
+        "trials": 0,
+        "seed": 0,
+        "p_success": 0,
+        "p50_ms": 0,
+        "p95_ms": 0,
+        "mc_successes": 0,
+        "notes": [
+          "Capability cap.write allowed.",
+          "trials must be positive; static preview returned."
+        ]
+      }
     }
   ],
   "form_template_cases": [

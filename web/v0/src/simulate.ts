@@ -270,6 +270,22 @@ export function dryRunMonteCarlo(
       factors: [],
     };
   }
+  if (mc.trials === 0) {
+    // Zero trials would divide by zero below; the static preview is the only
+    // honest answer. Pinned by the shared contract fixtures.
+    return {
+      ...base,
+      probabilistic: false,
+      trials: 0,
+      seed: 0,
+      p_success: 0,
+      p50_ms: 0,
+      p95_ms: 0,
+      mc_successes: 0,
+      factors: [],
+      notes: [...base.notes, "trials must be positive; static preview returned."],
+    };
+  }
   const rng = new MonteCarloRng(mc.seed);
   let successes = 0;
   const successDurations: number[] = [];

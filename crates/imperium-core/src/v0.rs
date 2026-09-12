@@ -1276,6 +1276,14 @@ pub fn dry_run_monte_carlo(
         // Hard denial: uncertainty never softens a denial.
         return base;
     }
+    if trials == 0 {
+        // Zero trials would divide by zero below; the static preview is the
+        // only honest answer. Pinned by the shared contract fixtures.
+        let mut base = base;
+        base.notes
+            .push("trials must be positive; static preview returned.".into());
+        return base;
+    }
     let mut rng = MonteCarloRng::new(seed);
     let mut successes: u64 = 0;
     let mut success_durations: Vec<u64> = vec![];
@@ -1778,6 +1786,21 @@ mod tests {
         assert!(!mc_gate(899, 1000));
         assert!(!mc_gate(0, 1000));
         assert!(!mc_gate(1, 0)); // no trials → never passes
+    }
+
+    #[test]
+    fn monte_carlo_zero_trials_returns_static_preview() {
+        let ir = write_ir_for_mc();
+        let sim = dry_run_monte_carlo(&ir, None, None, 0, 7);
+        assert!(!sim.probabilistic);
+        assert_eq!(sim.trials, 0);
+        assert_eq!(sim.mc_successes, 0);
+        assert_eq!(sim.p_success, 0.0);
+        assert!(sim.p_success.is_finite());
+        assert!(sim
+            .notes
+            .iter()
+            .any(|n| n == "trials must be positive; static preview returned."));
     }
 
     #[test]

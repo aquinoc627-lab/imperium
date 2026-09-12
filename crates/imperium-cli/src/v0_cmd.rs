@@ -576,6 +576,9 @@ impl V0Home {
         let policy = self.load_policy()?;
         let (sim, dry_events) = match mc {
             Some((trials, seed)) => {
+                if trials == 0 {
+                    bail!("--trials must be positive");
+                }
                 let seed = seed.unwrap_or_else(|| derive_seed(&rec.ir.id.to_string()));
                 let core_stats = self.core_world_stats()?;
                 let s =
@@ -1722,6 +1725,18 @@ mod tests {
         let read_id = rec.ir.id.to_string();
         home.simulate_opts(&read_id, Some((1000, Some(3)))).unwrap();
         assert!(home.approve(&read_id).is_err());
+    }
+
+    #[test]
+    fn monte_carlo_zero_trials_is_rejected() {
+        let home = tmp_home();
+        let rec = home.compile("Echo this message: ping", false).unwrap();
+        let id = rec.ir.id.to_string();
+        let err = home
+            .simulate_opts(&id, Some((0, Some(1))))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("--trials must be positive"), "{err}");
     }
 
     // --- Phase 13: the evolution loop ---

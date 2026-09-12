@@ -55,3 +55,4 @@ jobs:
       - run: cargo test -p imperium-store
       - run: cargo test -p imperium-cli
       - run: bash scripts/v0-smoke.sh
+      - run: bash scripts/test-release.sh

@@ -1,0 +1,100 @@
+name: release
+
+# Phase 22 — tag-triggered release packaging. Each platform job builds and
+# packages via scripts/make-release-artifacts.sh; the final job assembles
+# checksums + unsigned SLSA Level 1 provenance and creates the release.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  version-check:
+    name: tag matches crate version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: v
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          crate="$(sed -n 's/^version = "\(.*\)"/\1/p' crates/imperium-cli/Cargo.toml)"
+          test -n "$tag" && test "$tag" = "$crate" || {
+            echo "tag $GITHUB_REF_NAME != imperium-cli version $crate" >&2
+            exit 1
+          }
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: build (${{ matrix.target }})
+    needs: version-check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Setup Node (linux gate)
+        if: runner.os == 'Linux'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Gate — v0 JS kernel (linux only)
+        if: runner.os == 'Linux'
+        run: node --experimental-strip-types --test "src/*.test.ts"
+        working-directory: web/v0
+      - name: Gate — clippy (linux only)
+        if: runner.os == 'Linux'
+        run: cargo clippy -p imperium-core -p imperium-store -p imperium-cli --all-targets -- -D warnings
+      - name: Cargo tests (all platforms)
+        run: cargo test -p imperium-core -p imperium-store -p imperium-cli -q
+      - name: Gate — CLI smoke (linux only)
+        if: runner.os == 'Linux'
+        run: bash scripts/v0-smoke.sh
+      - name: Gate — release-script checks (linux only)
+        if: runner.os == 'Linux'
+        run: bash scripts/test-release.sh
+      - name: Package
+        run: bash scripts/make-release-artifacts.sh --out dist "$GITHUB_REF_NAME"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/imperium-*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: assemble and publish
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: dist-*
+          merge-multiple: true
+      - name: Checksums over all tarballs
+        run: (cd dist && shasum -a 256 imperium-*.tar.gz > SHA256SUMS)
+      - name: Provenance (unsigned SLSA Level 1)
+        run: bash scripts/gen-provenance.sh "$GITHUB_REF_NAME" > dist/provenance.json
+      - name: Publish release
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/imperium-*.tar.gz dist/SHA256SUMS dist/provenance.json \
+            --title "$GITHUB_REF_NAME" --generate-notes --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}

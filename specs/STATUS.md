@@ -28,6 +28,7 @@ validated against the shared fixtures in `tests/contract/v0_kernel.json`.
 | 19 | Voice input (workbench) | Done — `specs/19-voice-input.md`. Input-only; no TTS; browser STT may leave the device. |
 | 20 | MC factor breadth | Done — `specs/20-mc-factor-breadth.md`. Factors gain duration + retry notes; sampling unchanged. |
 | 21 | Host-layer hardening | Done — `specs/21-host-hardening.md`. Property tests (`proptest`, dev-only) found and fixed two panics (`diff_preview` underflow, `starts_ci` byte-boundary); NL-source 64 KiB cap and 1 MiB policy cap, both kernels, pinned by fixtures. |
+| 22 | Release & distribution | Done — `specs/22-release.md`. Tag-triggered matrix builds (macOS arm64/x86_64, Linux x86_64), SHA256SUMS, unsigned SLSA Level 1 provenance, Homebrew formula generator; scripts are gate-tested. |
 
 ## Kernel consolidation (Phase 7)
 
@@ -49,10 +50,12 @@ validated against the shared fixtures in `tests/contract/v0_kernel.json`.
 
 ## Planned
 
-Phases 19–21 shipped (voice input-only; MC factor breadth; host-layer
-hardening). Specs `02`–`04` retain deferred depth (causal graphs, A/B
-auto-promotion, LLM patching, P2P, offline/on-device STT, TPM/SLSA) that
-would each need a new named spec.
+Phases 19–22 shipped (voice input-only; MC factor breadth; host-layer
+hardening; release & distribution). Specs `02`–`04` retain deferred depth
+(causal graphs, A/B auto-promotion, LLM patching, P2P, offline/on-device
+STT, TPM/SLSA) that would each need a new named spec. SLSA Levels 2–4 and
+sigstore signing remain deferred even after Phase 22 (provenance is
+emitted, not signed).
 
 Owner-named next candidates: none queued. Pick a new named phase before coding.
 

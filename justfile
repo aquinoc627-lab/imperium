@@ -8,6 +8,7 @@ help:
 # One-shot after clone. Requires Node 22+ and Rust stable.
 v0: test-v0-js test-v0-rust
 	bash scripts/v0-smoke.sh
+	bash scripts/test-release.sh
 
 # --- v0 slice (working product) ---
 

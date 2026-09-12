@@ -26,6 +26,10 @@ echo_out="$("$BIN" intent execute --intent-id "$echo_id")"
 printf '%s\n' "$echo_out" | grep -q ping
 "$BIN" intent replay --intent-id "$echo_id" >/dev/null
 
+# Multibyte echo: must compile (no truncation panic) and keep every char.
+mb_line="$("$BIN" intent compile --input "Echo this message: ああああああああああああああ")"
+printf '%s\n' "$mb_line" | grep -q "Echo ああああああああああああああ"
+
 write_line="$("$BIN" intent compile --input "Write file notes.txt with contents hello-from-v0")"
 write_id="$(printf '%s\n' "$write_line" | awk '{print $1}')"
 "$BIN" intent simulate --intent-id "$write_id" --json | grep -q effects_preview

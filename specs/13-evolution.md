@@ -48,7 +48,8 @@ approval — nothing is skipped) with one difference: destructive effects are
   `cap.http` is refused in shadow mode (`fetch cannot run in shadow mode`).
 - All shadow events carry `"shadow": true`; the **fold skips them** — a
   shadow run never advances the intent's status (it stays `Approved`), and
-  replay still agrees with the store (tested).
+  replay still agrees with the store (tested). The world model skips them
+  too (spec 12): redirected runs are provenance, not capability facts.
 - The run folds a `ShadowVerified` event comparing the dry-run's
   `effects_preview` against the shadow run's actual effects (paths
   normalized: `scratch/shadow/x` ≡ `scratch/x`):

@@ -33,6 +33,9 @@ fold is the truth, so there is no new state to corrupt:
   `TaskSucceeded.at` deltas), sample counts.
 - Only executions that reached `TaskStarted` count as samples — token and
   denial failures are not capability performance data.
+- Shadow executions (`"shadow": true`) are provenance, not world facts:
+  they are excluded from sample counts and duration samples (spec 13), so
+  redirected runs can never inflate the stats behind the approval gate.
 - Fewer than 5 duration samples ⇒ the static estimate is used per attempt
   (and the factor note is marked `prior`).
 - `imperium world show` prints the facts. Implemented as

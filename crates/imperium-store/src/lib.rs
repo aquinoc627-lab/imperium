@@ -365,6 +365,9 @@ impl Ledger {
             let entry = out.entry(cap).or_default();
             let mut started_at: Option<i64> = None;
             for ev in &doc.events {
+                if ev.payload.get("shadow") == Some(&serde_json::Value::Bool(true)) {
+                    continue;
+                }
                 match ev.kind.as_str() {
                     "TaskStarted" => started_at = ev.at,
                     "TaskSucceeded" => {
@@ -590,5 +593,53 @@ mod tests {
         );
         ledger.sync(&doc).unwrap();
         assert_eq!(ledger.deny_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn world_stats_ignores_shadow_runs() {
+        let tmp = std::env::temp_dir().join(tmp_tag("shadow-world"));
+        let ledger = Ledger::open(&tmp.join("ledger.db")).unwrap();
+        let ev = |kind: &str, at: Option<i64>, payload: serde_json::Value| EventDocument {
+            kind: kind.into(),
+            payload,
+            at,
+        };
+        // A redirected shadow run: real TaskStarted/Succeeded pair, but
+        // tagged shadow: provenance, not capability performance data.
+        let mut shadow = doc("approved", "shadow-run", None, vec![]);
+        shadow.events = vec![
+            ev(
+                "TaskStarted",
+                Some(100),
+                serde_json::json!({"task_id": "t1", "shadow": true}),
+            ),
+            ev(
+                "TaskSucceeded",
+                Some(120),
+                serde_json::json!({"shadow": true, "output": "wrote scratch/shadow/x.txt"}),
+            ),
+        ];
+        ledger.sync(&shadow).unwrap();
+        // One real execution of the same capability.
+        let mut real = doc("executed", "real-run", Some("ping"), vec![]);
+        real.events = vec![
+            ev(
+                "TaskStarted",
+                Some(200),
+                serde_json::json!({"task_id": "t1"}),
+            ),
+            ev(
+                "TaskSucceeded",
+                Some(230),
+                serde_json::json!({"output": "ping"}),
+            ),
+        ];
+        ledger.sync(&real).unwrap();
+
+        let world = ledger.world_stats().unwrap();
+        let echo = world.get("cap.echo").expect("real run is a sample");
+        assert_eq!(echo.samples, 1, "shadow runs must not count as samples");
+        assert_eq!(echo.successes, 1);
+        assert_eq!(echo.durations_ms, vec![30]);
     }
 }

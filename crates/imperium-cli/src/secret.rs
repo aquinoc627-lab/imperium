@@ -85,7 +85,21 @@ impl SecretStore for FileStore {
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        Ok(std::fs::write(&self.path, value)?)
+        #[cfg(unix)]
+        {
+            // The HMAC signing secret must never be world-readable.
+            use std::io::Write;
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut file = std::fs::OpenOptions::new();
+            file.write(true).create(true).truncate(true).mode(0o600);
+            file.open(&self.path)?.write_all(value.as_bytes())?;
+            return Ok(());
+        }
+        #[cfg(not(unix))]
+        {
+            std::fs::write(&self.path, value)?;
+            Ok(())
+        }
     }
 
     fn delete(&self) -> Result<()> {
@@ -357,6 +371,19 @@ mod tests {
     fn fingerprint_is_stable_prefix() {
         let s = generate_secret();
         assert_eq!(fingerprint(&s), s[..8].to_string());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn file_store_writes_secret_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("imp-secret-mode-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let store = FileStore::new(&dir);
+        store.put("value-1").unwrap();
+        let mode = std::fs::metadata(store.path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600, "secret file must be owner-only");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
 

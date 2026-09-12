@@ -66,9 +66,9 @@ impl V0Home {
             crate::secret::resolve_backend(&self.root),
             Ok(crate::secret::Backend::File)
         ) {
-            let secret = self.root.join("token.secret");
-            if !secret.exists() {
-                fs::write(&secret, crate::secret::generate_secret())?;
+            let store = crate::secret::FileStore::new(&self.root);
+            if store.get()?.is_none() {
+                store.put(&crate::secret::generate_secret())?;
             }
         }
         let grants = self.root.join("grants.json");

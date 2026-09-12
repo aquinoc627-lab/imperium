@@ -256,10 +256,16 @@ impl Ledger {
     }
 
     pub fn search(&self, query: &str) -> Result<Vec<SearchHit>> {
-        let like = format!("%{}%", query.replace('%', ""));
+        // Literal search: escape LIKE metacharacters so `%` and `_` in a
+        // query can never act as wildcards.
+        let like = format!(
+            "%{}%",
+            query.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+        );
         let mut stmt = self.conn.prepare(
             "SELECT id, name, status, nl_source FROM intents
-             WHERE name LIKE ?1 OR nl_source LIKE ?1 OR output LIKE ?1
+             WHERE name LIKE ?1 ESCAPE '\\' OR nl_source LIKE ?1 ESCAPE '\\'
+             OR output LIKE ?1 ESCAPE '\\'
              ORDER BY compiled_at, id",
         )?;
         let hits = stmt
@@ -576,6 +582,23 @@ mod tests {
             }
         }
         assert_eq!(a.semantic_key(), b.semantic_key());
+    }
+
+    #[test]
+    fn search_treats_like_metacharacters_literally() {
+        let tmp = std::env::temp_dir().join(tmp_tag("like"));
+        let ledger = Ledger::open(&tmp.join("ledger.db")).unwrap();
+        ledger.sync(&doc("compiled", "a_b", None, vec![])).unwrap();
+        ledger.sync(&doc("compiled", "aXb", None, vec![])).unwrap();
+        // Literal underscore matches only the record that contains it.
+        let hits = ledger.search("a_b").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].name, "a_b");
+        // Underscore must not act as a single-char wildcard.
+        assert!(ledger.search("aXb").unwrap().len() == 1);
+        assert!(ledger.search("aYb").unwrap().is_empty());
+        // Percent is literal too.
+        assert!(ledger.search("%").unwrap().is_empty());
     }
 
     #[test]

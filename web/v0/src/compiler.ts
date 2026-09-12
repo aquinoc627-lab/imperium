@@ -135,7 +135,7 @@ export function compileRules(nl: string):
     if (!message) return { ok: false, error: "Echo message is empty." };
     return {
       ok: true,
-      ir: baseIr(`Echo ${message.slice(0, 40)}`, source, `Echo the text ${message}`, {
+      ir: baseIr(`Echo ${[...message].slice(0, 40).join("")}`, source, `Echo the text ${message}`, {
         id: crypto.randomUUID(),
         name: "Echo",
         description: message,

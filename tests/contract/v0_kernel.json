@@ -54,6 +54,110 @@
       }
     },
     {
+      "name": "echo_multibyte_short",
+      "input": "Echo this message: ああああああああああああああ",
+      "expected_ir": {
+        "id": "<uuid>",
+        "name": "Echo ああああああああああああああ",
+        "nl_source": "Echo this message: ああああああああああああああ",
+        "goal": {
+          "description": "Echo the text ああああああああああああああ",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [
+          {
+            "id": "sc1",
+            "metric": "TestPassRate",
+            "threshold": {
+              "operator": "GreaterThanOrEqual",
+              "value": 1,
+              "unit": "ratio"
+            },
+            "weight": 1
+          }
+        ],
+        "tasks": [
+          {
+            "id": "<task-uuid>",
+            "name": "Echo",
+            "description": "ああああああああああああああ",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.echo"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 10,
+            "target_path": null,
+            "effects": [
+              {
+                "type": "echo",
+                "text": "ああああああああああああああ"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.0,
+        "requires_approval": false,
+        "version": 2,
+        "compiled_at": "<ts>",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      }
+    },
+    {
+      "name": "echo_multibyte_long",
+      "input": "Echo this message: あああああああああああああああああああああああああああああああああああああああああああああ",
+      "expected_ir": {
+        "id": "<uuid>",
+        "name": "Echo ああああああああああああああああああああああああああああああああああああああああ",
+        "nl_source": "Echo this message: あああああああああああああああああああああああああああああああああああああああああああああ",
+        "goal": {
+          "description": "Echo the text あああああああああああああああああああああああああああああああああああああああああああああ",
+          "category": "Automation",
+          "priority": "Normal"
+        },
+        "constraints": [],
+        "success_criteria": [
+          {
+            "id": "sc1",
+            "metric": "TestPassRate",
+            "threshold": {
+              "operator": "GreaterThanOrEqual",
+              "value": 1,
+              "unit": "ratio"
+            },
+            "weight": 1
+          }
+        ],
+        "tasks": [
+          {
+            "id": "<task-uuid>",
+            "name": "Echo",
+            "description": "あああああああああああああああああああああああああああああああああああああああああああああ",
+            "kind": "Custom",
+            "capabilities": [
+              "cap.echo"
+            ],
+            "dependencies": [],
+            "estimated_duration_ms": 10,
+            "target_path": null,
+            "effects": [
+              {
+                "type": "echo",
+                "text": "あああああああああああああああああああああああああああああああああああああああああああああ"
+              }
+            ]
+          }
+        ],
+        "risk_score": 0.0,
+        "requires_approval": false,
+        "version": 2,
+        "compiled_at": "<ts>",
+        "compiler_version": "imperium-intent-rules-0.4.0"
+      }
+    },
+    {
       "name": "write",
       "input": "Write file notes.txt with contents hello",
       "expected_ir": {

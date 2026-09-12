@@ -569,10 +569,10 @@ fn base_ir(name: String, source: &str, goal: &str, task: Task) -> IntentIR {
 }
 
 fn truncate(s: &str, n: usize) -> String {
-    if s.len() <= n {
+    if s.chars().count() <= n {
         s.to_string()
     } else {
-        s[..n].to_string()
+        s.chars().take(n).collect()
     }
 }
 
@@ -1367,6 +1367,19 @@ mod tests {
         let sim = simulate_static(&ir);
         assert_eq!(sim.success_probability, 1.0);
         assert_eq!(sim.risk, 0.0);
+    }
+
+    #[test]
+    fn echo_name_truncates_on_char_boundaries() {
+        // 14 x 3-byte chars = 42 bytes: the old byte slice cut mid-char and
+        // panicked. Char-boundary truncation keeps all 14 (<= 40 chars).
+        let short = compile_rules("Echo this message: ああああああああああああああ").unwrap();
+        assert_eq!(short.name, "Echo ああああああああああああああ");
+        // 45 chars: the name is truncated to the first 40 code points.
+        let msg45 = "あ".repeat(45);
+        let long = compile_rules(&format!("Echo this message: {msg45}")).unwrap();
+        assert_eq!(long.name, format!("Echo {}", "あ".repeat(40)));
+        assert_eq!(long.tasks[0].description, msg45);
     }
 
     #[test]

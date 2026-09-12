@@ -260,7 +260,10 @@ impl Ledger {
         // query can never act as wildcards.
         let like = format!(
             "%{}%",
-            query.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+            query
+                .replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_")
         );
         let mut stmt = self.conn.prepare(
             "SELECT id, name, status, nl_source FROM intents
@@ -528,7 +531,12 @@ mod tests {
         ledger.sync(&fail).unwrap();
         // Compile-only: never started — not a sample.
         ledger
-            .sync(&doc("compiled", "noop", None, vec![("IntentCompiled", serde_json::json!({}))]))
+            .sync(&doc(
+                "compiled",
+                "noop",
+                None,
+                vec![("IntentCompiled", serde_json::json!({}))],
+            ))
             .unwrap();
 
         let world = ledger.world_stats().unwrap();
@@ -560,7 +568,9 @@ mod tests {
 
         let ledger = Ledger::open(&tmp.join("ledger.db")).unwrap();
         // Seed a stale row, then rebuild should replace it.
-        ledger.sync(&doc("executed", "stale", Some("stale"), vec![])).unwrap();
+        ledger
+            .sync(&doc("executed", "stale", Some("stale"), vec![]))
+            .unwrap();
         let n = ledger.rebuild(&intents).unwrap();
         assert_eq!(n, 1);
         let hits = ledger.search("alpha").unwrap();

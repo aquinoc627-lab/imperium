@@ -170,7 +170,10 @@ impl V0Home {
             crate::secret::Backend::File => {
                 let store = crate::secret::FileStore::new(&self.root);
                 match store.get()? {
-                    Some(v) => format!("file backend, fingerprint={}", crate::secret::fingerprint(&v)),
+                    Some(v) => format!(
+                        "file backend, fingerprint={}",
+                        crate::secret::fingerprint(&v)
+                    ),
                     None => "file backend, no secret yet (created on first use)".to_string(),
                 }
             }
@@ -235,9 +238,7 @@ impl V0Home {
     pub fn secret_rotate(&self) -> Result<String> {
         let store: Box<dyn crate::secret::SecretStore> =
             match crate::secret::resolve_backend(&self.root)? {
-                crate::secret::Backend::File => {
-                    Box::new(crate::secret::FileStore::new(&self.root))
-                }
+                crate::secret::Backend::File => Box::new(crate::secret::FileStore::new(&self.root)),
                 crate::secret::Backend::Keychain => {
                     Box::new(crate::secret::KeychainStore::new(&self.root))
                 }
@@ -1275,11 +1276,8 @@ mod tests {
         let home = tmp_home();
         fs::create_dir_all(home.root.join("scratch")).unwrap();
         fs::create_dir_all(home.root.join("outside")).unwrap();
-        std::os::unix::fs::symlink(
-            home.root.join("outside"),
-            home.root.join("scratch/link"),
-        )
-        .unwrap();
+        std::os::unix::fs::symlink(home.root.join("outside"), home.root.join("scratch/link"))
+            .unwrap();
 
         // Write through the planted link is denied at execute.
         let w = home
@@ -2083,7 +2081,9 @@ mod tests {
     fn signing_uses_the_file_secret_stably() {
         let home = tmp_home();
         let before = std::fs::read_to_string(home.root.join("token.secret")).unwrap();
-        let rec = home.compile("Echo this message: secret-smoke", false).unwrap();
+        let rec = home
+            .compile("Echo this message: secret-smoke", false)
+            .unwrap();
         let id = rec.ir.id.to_string();
         home.simulate_opts(&id, None).unwrap();
         home.approve(&id).unwrap();

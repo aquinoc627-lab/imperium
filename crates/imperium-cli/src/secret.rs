@@ -93,7 +93,7 @@ impl SecretStore for FileStore {
             let mut file = std::fs::OpenOptions::new();
             file.write(true).create(true).truncate(true).mode(0o600);
             file.open(&self.path)?.write_all(value.as_bytes())?;
-            return Ok(());
+            Ok(())
         }
         #[cfg(not(unix))]
         {
@@ -259,7 +259,6 @@ pub fn generate_secret() -> String {
     )
 }
 
-
 /// Short, display-safe identifier for `secret status`.
 pub fn fingerprint(secret: &str) -> String {
     secret.chars().take(8).collect()
@@ -331,7 +330,14 @@ mod tests {
         );
         assert_eq!(
             keychain_args("delete-generic-password", acct, None),
-            vec!["security", "delete-generic-password", "-s", "imperium", "-a", acct]
+            vec![
+                "security",
+                "delete-generic-password",
+                "-s",
+                "imperium",
+                "-a",
+                acct
+            ]
         );
     }
 
@@ -386,4 +392,3 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
-

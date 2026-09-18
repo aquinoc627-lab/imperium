@@ -72,7 +72,7 @@ jobs:
         run: bash scripts/test-release.sh
       - name: Package
         run: bash scripts/make-release-artifacts.sh --out dist --target "${{ matrix.target }}" "$GITHUB_REF_NAME"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.target }}
           path: dist/imperium-*.tar.gz

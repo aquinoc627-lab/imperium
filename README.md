@@ -50,6 +50,15 @@ packaging is reproducible locally via `scripts/make-release-artifacts.sh`;
 `scripts/test-release.sh` validates the formula and provenance generators
 against a fixture release directory and runs in the `just v0` gate.
 
+**Publishing without GitHub Actions**: releases are created from tag
+pushes when Actions is available, but the same artifacts can be published
+from any machine — GitHub Releases are not gated by Actions billing:
+
+```bash
+bash scripts/make-release-artifacts.sh --out dist 0.2.0
+GH_PAT=<token> bash scripts/publish-release.sh 0.2.0
+```
+
 Without `just`:
 
 ```bash

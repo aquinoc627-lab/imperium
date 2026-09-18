@@ -39,4 +39,12 @@ assert all("sha256" in x["digest"] for x in s["subject"])
 print("provenance ok")
 '
 
+# Local publish path (Phase 22 fallback, no Actions): dry-run must list
+# every tarball upload and never touch the network.
+PUB="$(bash scripts/publish-release.sh --dist "$FX" --dry-run "$VERSION")"
+for tgt in x86_64-unknown-linux-gnu aarch64-apple-darwin x86_64-apple-darwin; do
+  printf '%s\n' "$PUB" | grep -q "imperium-$VERSION-$tgt.tar.gz" || {
+    echo "publish dry-run missing $tgt" >&2; exit 1; }
+done
+
 echo "release-script checks ok"

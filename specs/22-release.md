@@ -64,6 +64,22 @@ runs the artifact script, uploads tarballs + SHA256SUMS as release
 assets via `gh release create` (the single authoritative job assembles
 the final release and publishes the provenance statement).
 
+### Local publish path (no Actions required)
+
+An Actions **billing lock does not block GitHub Releases**. The identical
+artifacts can be built and published from any machine:
+
+```bash
+bash scripts/make-release-artifacts.sh --out dist <version>
+GH_PAT=<token> bash scripts/publish-release.sh <version>
+```
+
+`publish-release.sh` regenerates checksums + provenance, creates the
+release for the existing tag via the REST API, and replaces
+same-named assets (idempotent). Its `--dry-run` path is gate-tested
+without network. This is the documented fallback whenever the tag
+workflow cannot run.
+
 ## Fail-closed cases
 
 - Tag/crate-version mismatch: workflow fails before any build.

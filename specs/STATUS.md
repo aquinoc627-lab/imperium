@@ -28,7 +28,7 @@ validated against the shared fixtures in `tests/contract/v0_kernel.json`.
 | 19 | Voice input (workbench) | Done — `specs/19-voice-input.md`. Input-only; no TTS; browser STT may leave the device. |
 | 20 | MC factor breadth | Done — `specs/20-mc-factor-breadth.md`. Factors gain duration + retry notes; sampling unchanged. |
 | 21 | Host-layer hardening | Done — `specs/21-host-hardening.md`. Property tests (`proptest`, dev-only) found and fixed two panics (`diff_preview` underflow, `starts_ci` byte-boundary); NL-source 64 KiB cap and 1 MiB policy cap, both kernels, pinned by fixtures. |
-| 22 | Release & distribution | Done — `specs/22-release.md`. Tag-triggered matrix builds (macOS arm64/x86_64, Linux x86_64), SHA256SUMS, unsigned SLSA Level 1 provenance, Homebrew formula generator; scripts are gate-tested. |
+| 22 | Release & distribution | Done — `specs/22-release.md`. Tag-triggered matrix builds (macOS arm64/x86_64, Linux x86_64), SHA256SUMS, unsigned SLSA Level 1 provenance, Homebrew formula generator; scripts are gate-tested. Local publish path (`publish-release.sh`) works without Actions. |
 | 23 | MCP packaging | Done — `specs/23-mcp-packaging.md`. Client configs for Claude Desktop/Cursor/Windsurf/VS Code, machine-checked approval-free surface, real-binary stdio conversation test. |
 | 24 | CI governance | Done — `specs/24-ci-governance.md`. Composite action gates PRs on policy lint/test using a checksum-verified release binary; download/verify/tamper paths are gate-tested locally. |
 

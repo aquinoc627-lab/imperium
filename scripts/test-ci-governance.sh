@@ -48,7 +48,11 @@ mkdir -p "$STAGE/bin"
 cp "$BIN" "$STAGE/bin/imperium"
 cp LICENSE README.md "$STAGE/"
 tar -C "$STAGE" -czf "$FX/imperium-0.2.0-$TGT.tar.gz" .
-(cd "$FX" && shasum -a 256 "imperium-0.2.0-$TGT.tar.gz" > SHA256SUMS)
+if command -v sha256sum >/dev/null 2>&1; then
+  (cd "$FX" && sha256sum "imperium-0.2.0-$TGT.tar.gz" > SHA256SUMS)
+else
+  (cd "$FX" && shasum -a 256 "imperium-0.2.0-$TGT.tar.gz" > SHA256SUMS)
+fi
 out="$(bash scripts/ci-governance.sh \
   --from "file://$FX/imperium-0.2.0-$TGT.tar.gz" \
   --policy-dir "$FX/good")"

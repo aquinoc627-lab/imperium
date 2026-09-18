@@ -59,6 +59,24 @@ bash scripts/make-release-artifacts.sh --out dist 0.2.0
 GH_PAT=<token> bash scripts/publish-release.sh 0.2.0
 ```
 
+## CI on GitLab (fallback)
+
+`.gitlab-ci.yml` mirrors the gate for when GitHub Actions is unavailable:
+
+```bash
+git remote add gitlab git@gitlab.com:<you>/imperium.git
+git push gitlab master --tags
+```
+
+The `js-kernel` and `rust-gate` jobs run the same checks as `just v0`;
+`release-linux` (tag-triggered) builds the Linux artifact, uploads it with
+`SHA256SUMS` and provenance to the generic package registry, and creates a
+release whose assets point at the registry. GitLab.com free has no macOS
+runners, so macOS artifacts still come from the local publish path.
+`scripts/test-gitlab-ci.sh` validates the pipeline (YAML parse, expected
+jobs, tag gating, and `bash -n` on every embedded script) and runs in the
+gate.
+
 Without `just`:
 
 ```bash

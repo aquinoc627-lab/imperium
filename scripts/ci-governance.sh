@@ -45,7 +45,11 @@ fetch_verify() {
     exit 1
   fi
   local actual
-  actual="$(shasum -a 256 "$work/$name" | awk '{ print $1 }')"
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual="$(sha256sum "$work/$name" | awk '{ print $1 }')"
+  else
+    actual="$(shasum -a 256 "$work/$name" | awk '{ print $1 }')"
+  fi
   if [ "$expected" != "$actual" ]; then
     echo "checksum mismatch for $name: expected $expected got $actual" >&2
     exit 1

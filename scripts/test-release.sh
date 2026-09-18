@@ -15,7 +15,11 @@ for tgt in x86_64-unknown-linux-gnu aarch64-apple-darwin x86_64-apple-darwin; do
     || true
   printf '%064d' 0 > "$FX/digest"
 done
-(cd "$FX" && shasum -a 256 imperium-*.tar.gz > SHA256SUMS)
+if command -v sha256sum >/dev/null 2>&1; then
+  (cd "$FX" && sha256sum imperium-*.tar.gz > SHA256SUMS)
+else
+  (cd "$FX" && shasum -a 256 imperium-*.tar.gz > SHA256SUMS)
+fi
 
 # Formula: deterministic, contains every checksum, valid ruby keywords.
 FORMULA="$(bash scripts/gen-homebrew-formula.sh --release-dir "$FX" "$VERSION")"

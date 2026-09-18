@@ -11,6 +11,7 @@ v0: test-v0-js test-v0-rust
 	bash scripts/test-release.sh
 	bash scripts/test-mcp-clients.sh
 	bash scripts/test-ci-governance.sh
+	bash scripts/test-gitlab-ci.sh
 
 # --- v0 slice (working product) ---
 

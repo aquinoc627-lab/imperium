@@ -40,6 +40,14 @@ validated against the shared fixtures in `tests/contract/v0_kernel.json`.
   shared contract fixtures (compile, propose, token signature, simulate, fold).
 - The CLI consumes the Rust kernel.
 
+## CI portability
+
+- Primary: GitHub Actions (`ci.yaml`, `v0.yaml`, `release.yaml`).
+- Fallback mirror: `.gitlab-ci.yml` (js + rust gate jobs; Linux-only
+  release job — GitLab.com free has no macOS runners, so macOS artifacts
+  come from the local publish path in specs/22-release.md). The pipeline
+  config is machine-checked by `scripts/test-gitlab-ci.sh` in the gate.
+
 ## Still scaffolding (inert — do not extend)
 
 - `crates/imperium-{daemon,runtime,sync,voice,ffi,crypto,policy}` — not workspace members

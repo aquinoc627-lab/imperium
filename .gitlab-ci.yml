@@ -1,0 +1,95 @@
+# IMPERIUM — GitLab CI mirror (fallback while GitHub Actions is unavailable).
+# Gate: the same `just v0` steps, split into the js and rust jobs.
+# Release: on v* tags, builds the Linux artifact, uploads it (plus
+# SHA256SUMS and provenance) to the generic package registry, and creates
+# a release whose asset links point at the registry. macOS artifacts come
+# from the local publish path (specs/22-release.md) — GitLab.com free
+# tier has no macOS runners.
+
+stages:
+  - test
+  - release
+
+variables:
+  RUST_BACKTRACE: "1"
+  CARGO_HOME: "$CI_PROJECT_DIR/.cargo"
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - target/
+    - .cargo/
+
+js-kernel:
+  stage: test
+  image: node:22-bookworm
+  script:
+    - cd web/v0 && node --experimental-strip-types --test src/*.test.ts
+
+rust-gate:
+  stage: test
+  image: rust:1-bookworm
+  script:
+    - command -v python3 >/dev/null || (apt-get update -qq && apt-get install -y -qq python3)
+    - command -v curl >/dev/null || (apt-get update -qq && apt-get install -y -qq curl)
+    - rustup component add clippy
+    - cargo clippy -p imperium-core -p imperium-store -p imperium-cli --all-targets -- -D warnings
+    - cargo test -p imperium-core
+    - cargo test -p imperium-store
+    - cargo test -p imperium-cli
+    - bash scripts/v0-smoke.sh
+    - bash scripts/test-release.sh
+    - bash scripts/test-mcp-clients.sh
+    - bash scripts/test-ci-governance.sh
+    - bash scripts/test-gitlab-ci.sh
+
+release-linux:
+  stage: release
+  image: rust:1-bookworm
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+  script:
+    - command -v python3 >/dev/null || (apt-get update -qq && apt-get install -y -qq python3)
+    - command -v curl >/dev/null || (apt-get update -qq && apt-get install -y -qq curl)
+    - VERSION="${CI_COMMIT_TAG#v}"
+    - CRATE="$(sed -n 's/^version = "\(.*\)"/\1/p' crates/imperium-cli/Cargo.toml)"
+    - test "$VERSION" = "$CRATE" || { echo "tag $CI_COMMIT_TAG != crate version $CRATE" >&2; exit 1; }
+    - bash scripts/make-release-artifacts.sh --out dist "$CI_COMMIT_TAG"
+    - bash scripts/gen-provenance.sh "$CI_COMMIT_TAG" > dist/provenance.json
+    - |
+      PKG="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/imperium/$VERSION"
+      curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        --upload-file "dist/imperium-$VERSION-x86_64-unknown-linux-gnu.tar.gz" \
+        "$PKG/imperium-$VERSION-x86_64-unknown-linux-gnu.tar.gz"
+      curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        --upload-file dist/SHA256SUMS "$PKG/SHA256SUMS"
+      curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        --upload-file dist/provenance.json "$PKG/provenance.json"
+    - |
+      PKG_URL="$CI_PROJECT_URL/-/packages/generic/imperium/$VERSION"
+      python3 - "$PKG_URL" "$VERSION" <<'PY' > /tmp/release.json
+      import json, os, sys
+      pkg, version = sys.argv[1], sys.argv[2]
+      payload = {
+          "name": f"v{version}",
+          "tag_name": os.environ["CI_COMMIT_TAG"],
+          "description": (
+              f"IMPERIUM v{version} - GitLab CI build. Linux x86_64 only; macOS "
+              "artifacts come from the local publish path (specs/22-release.md). "
+              "Unsigned SLSA Level 1 provenance attached."
+          ),
+          "assets": {"links": [
+              {"name": f"imperium-{version}-x86_64-unknown-linux-gnu.tar.gz",
+               "url": f"{pkg}/imperium-{version}-x86_64-unknown-linux-gnu.tar.gz"},
+              {"name": "SHA256SUMS", "url": f"{pkg}/SHA256SUMS"},
+              {"name": "provenance.json", "url": f"{pkg}/provenance.json"},
+          ]},
+      }
+      print(json.dumps(payload))
+      PY
+    - |
+      TOKEN="${RELEASE_TOKEN:-$CI_JOB_TOKEN}"
+      curl -fsS --header "PRIVATE-TOKEN: $TOKEN" \
+        --header "Content-Type: application/json" \
+        --data-binary @/tmp/release.json \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"

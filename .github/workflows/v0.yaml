@@ -58,3 +58,4 @@ jobs:
       - run: bash scripts/test-release.sh
       - run: bash scripts/test-mcp-clients.sh
       - run: bash scripts/test-ci-governance.sh
+      - run: bash scripts/test-gitlab-ci.sh

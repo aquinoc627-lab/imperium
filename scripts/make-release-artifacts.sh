@@ -73,7 +73,18 @@ cp LICENSE README.md "$PKG/"
 tar -C "$PKG" -czf "$OUT/imperium-$VERSION-$TARGET.tar.gz" .
 
 # The SHA256SUMS file covers every tarball found in OUT (multi-OS releases
-# upload their parts before the final checksum pass).
-(cd "$OUT" && shasum -a 256 imperium-*.tar.gz > SHA256SUMS)
+# upload their parts before the final checksum pass). sha256sum on Linux,
+# shasum -a 256 on macOS.
+checksum_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{ print $1 }'
+  else
+    shasum -a 256 "$1" | awk '{ print $1 }'
+  fi
+}
+: > "$OUT/SHA256SUMS"
+for f in "$OUT"/imperium-*.tar.gz; do
+  printf '%s  %s\n' "$(checksum_file "$f")" "$(basename "$f")" >> "$OUT/SHA256SUMS"
+done
 
 echo "packaged $OUT/imperium-$VERSION-$TARGET.tar.gz"

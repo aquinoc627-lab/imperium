@@ -55,11 +55,14 @@ Emits an in-toto statement (`slsaProvenance` v0.2) per artifact subject:
 
 ### Workflow (`.github/workflows/release.yaml`)
 
-Trigger: push of `v*` tags. Matrix: `macos-14` (arm64), `macos-13`
-(x86_64), `ubuntu-24.04` (x86_64). Each job runs the artifact script,
-uploads tarballs + SHA256SUMS as release assets via `gh release create`
-(the single authoritative job assembles the final release and publishes
-the provenance statement).
+Trigger: push of `v*` tags. Matrix: `macos-14` (arm64), `macos-14`
+cross-compiling `x86_64-apple-darwin` (the `macos-13` Intel runner pool
+is deprecated upstream — the first release attempt waited 24h for a
+runner and was cancelled; the fix cross-compiles with clang + SDKROOT,
+verified locally and on the runner), `ubuntu-24.04` (x86_64). Each job
+runs the artifact script, uploads tarballs + SHA256SUMS as release
+assets via `gh release create` (the single authoritative job assembles
+the final release and publishes the provenance statement).
 
 ## Fail-closed cases
 

@@ -38,7 +38,9 @@ jobs:
         include:
           - os: macos-14
             target: aarch64-apple-darwin
-          - os: macos-13
+          # macos-13 (x86_64) runners are deprecated upstream; cross-compile
+          # the Intel macOS binary on the arm64 runner instead.
+          - os: macos-14
             target: x86_64-apple-darwin
           - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
@@ -69,7 +71,7 @@ jobs:
         if: runner.os == 'Linux'
         run: bash scripts/test-release.sh
       - name: Package
-        run: bash scripts/make-release-artifacts.sh --out dist "$GITHUB_REF_NAME"
+        run: bash scripts/make-release-artifacts.sh --out dist --target "${{ matrix.target }}" "$GITHUB_REF_NAME"
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.target }}

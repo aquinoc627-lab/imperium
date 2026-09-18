@@ -1,0 +1,33 @@
+name: "IMPERIUM policy gate"
+description: "Lint the semantic firewall and run policy.tests.json in CI (Phase 24)"
+inputs:
+  policy-dir:
+    description: "Directory containing policy.imp and policy.tests.json"
+    default: ".imperium"
+  version:
+    description: "imperium release version to gate with"
+    default: "0.2.0"
+runs:
+  using: composite
+  steps:
+    - name: Detect platform triple
+      id: triple
+      shell: bash
+      run: |
+        case "$(uname -s)/$(uname -m)" in
+          Darwin/arm64)  echo "triple=aarch64-apple-darwin" >> "$GITHUB_OUTPUT" ;;
+          Darwin/x86_64) echo "triple=x86_64-apple-darwin" >> "$GITHUB_OUTPUT" ;;
+          Linux/x86_64)  echo "triple=x86_64-unknown-linux-gnu" >> "$GITHUB_OUTPUT" ;;
+          *) echo "unsupported platform: $(uname -s)/$(uname -m)" >&2; exit 1 ;;
+        esac
+    - name: Policy gate (checksum-verified release binary)
+      shell: bash
+      env:
+        IMPERIUM_VERSION: ${{ inputs.version }}
+        IMPERIUM_POLICY_DIR: ${{ inputs.policy-dir }}
+        IMPERIUM_TRIPLE: ${{ steps.triple.outputs.triple }}
+      run: |
+        v="${IMPERIUM_VERSION#v}"
+        url="https://github.com/aquinoc627-lab/imperium/releases/download/v${v}/imperium-${v}-${IMPERIUM_TRIPLE}.tar.gz"
+        bash "$GITHUB_ACTION_PATH/scripts/ci-governance.sh" \
+          --from "$url" --policy-dir "$IMPERIUM_POLICY_DIR"

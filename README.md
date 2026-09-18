@@ -200,6 +200,25 @@ config that references approval verbs, and
 `crates/imperium-cli/tests/mcp_stdio.rs` drives the real binary through a
 full agent-host conversation in the gate.
 
+## The firewall as a CI gate (Phase 24)
+
+Commit `.imperium/policy.imp` and `.imperium/policy.tests.json` to a repo
+and make every PR answer to them:
+
+```yaml
+- uses: aquinoc627-lab/imperium@master
+  with:
+    policy-dir: .imperium
+    version: 0.2.0
+```
+
+The action downloads the checksum-verified release binary (Phase 22) for
+the runner platform, then runs `policy lint` + `policy test` — the
+workflow fails on lint errors or any FAILing entry. The gate refuses to
+run without a `policy.tests.json`. `scripts/test-ci-governance.sh`
+exercises the whole path locally (including the download/verify flow via
+`file://` and a checksum-tamper rejection) and runs in the `just v0` gate.
+
 ## Policy tests, impact, coverage
 
 ```bash
@@ -267,6 +286,7 @@ named spec.
 | Host-layer hardening (property tests, input caps, symlink denial) | **Working** — `specs/21-host-hardening.md` |
 | Release & distribution (versioned artifacts, checksums, SLSA L1 provenance, Homebrew formula) | **Working** — `specs/22-release.md` |
 | MCP packaging (client configs, stdio conversation test, approval-free surface re-pinned) | **Working** — `specs/23-mcp-packaging.md` |
+| CI governance (composite action: checksum-verified binary, policy lint/test as a PR gate) | **Working** — `specs/24-ci-governance.md` |
 | WASM guest | **Working** in `web/v0` (echo/write/read/append/list host imports); CLI uses the same host rules |
 | Daemon and unused crates | Scaffold (not workspace members); mock workbench removed |
 | Air-gap, SLSA, TPM sealing, Sigstore | Targets, not implemented |

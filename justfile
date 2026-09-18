@@ -10,6 +10,7 @@ v0: test-v0-js test-v0-rust
 	bash scripts/v0-smoke.sh
 	bash scripts/test-release.sh
 	bash scripts/test-mcp-clients.sh
+	bash scripts/test-ci-governance.sh
 
 # --- v0 slice (working product) ---
 

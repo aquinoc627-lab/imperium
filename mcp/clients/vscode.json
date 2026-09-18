@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "imperium": {
+      "command": "imperium",
+      "args": ["mcp"]
+    }
+  }
+}

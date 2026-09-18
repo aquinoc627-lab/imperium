@@ -193,6 +193,13 @@ search, stats, world, forms, policy lint/explain. **Approval is deliberately
 not a tool** — an agent can propose and simulate, but the human approves in
 the CLI.
 
+Ready-to-paste client configs for Claude Desktop, Cursor, Windsurf, and
+VS Code live in [`mcp/clients/`](mcp/clients/README.md). The tool list is
+frozen and machine-checked: `scripts/test-mcp-clients.sh` refuses any
+config that references approval verbs, and
+`crates/imperium-cli/tests/mcp_stdio.rs` drives the real binary through a
+full agent-host conversation in the gate.
+
 ## Policy tests, impact, coverage
 
 ```bash
@@ -259,6 +266,7 @@ named spec.
 | MC factor breadth (duration + retry notes) | **Working** — `specs/20-mc-factor-breadth.md` |
 | Host-layer hardening (property tests, input caps, symlink denial) | **Working** — `specs/21-host-hardening.md` |
 | Release & distribution (versioned artifacts, checksums, SLSA L1 provenance, Homebrew formula) | **Working** — `specs/22-release.md` |
+| MCP packaging (client configs, stdio conversation test, approval-free surface re-pinned) | **Working** — `specs/23-mcp-packaging.md` |
 | WASM guest | **Working** in `web/v0` (echo/write/read/append/list host imports); CLI uses the same host rules |
 | Daemon and unused crates | Scaffold (not workspace members); mock workbench removed |
 | Air-gap, SLSA, TPM sealing, Sigstore | Targets, not implemented |
